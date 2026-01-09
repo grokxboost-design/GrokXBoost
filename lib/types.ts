@@ -24,10 +24,7 @@ export interface GrokMessage {
 }
 
 export interface GrokTool {
-  type: "x_search";
-  x_search: {
-    enabled: boolean;
-  };
+  type: "live_search";
 }
 
 export interface GrokAPIRequest {

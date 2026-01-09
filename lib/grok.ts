@@ -39,10 +39,7 @@ export async function analyzeXHandle(
     ],
     tools: [
       {
-        type: "x_search",
-        x_search: {
-          enabled: true,
-        },
+        type: "live_search",
       },
     ],
   };
