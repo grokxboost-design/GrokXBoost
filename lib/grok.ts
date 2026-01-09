@@ -65,17 +65,24 @@ export async function analyzeXHandle(
 
     if (!response.ok) {
       const errorText = await response.text();
-      let errorMessage = "Failed to analyze X handle";
+      let errorMessage = `API Error (${response.status}): `;
 
       if (response.status === 401) {
-        errorMessage = "Invalid API key. Please check your XAI_API_KEY.";
+        errorMessage += "Invalid API key. Please check your XAI_API_KEY.";
       } else if (response.status === 429) {
-        errorMessage =
-          "Rate limit exceeded. Please wait a moment and try again.";
+        errorMessage += "Rate limit exceeded. Please wait a moment and try again.";
       } else if (response.status === 404) {
-        errorMessage = "The requested X handle could not be found.";
+        errorMessage += "Model or endpoint not found.";
       } else if (response.status >= 500) {
-        errorMessage = "Grok API is temporarily unavailable. Please try again.";
+        errorMessage += "Grok API is temporarily unavailable. Please try again.";
+      } else {
+        // Show actual error for debugging
+        try {
+          const parsed = JSON.parse(errorText);
+          errorMessage += parsed.error?.message || errorText.slice(0, 200);
+        } catch {
+          errorMessage += errorText.slice(0, 200);
+        }
       }
 
       throw new GrokAPIError(errorMessage, response.status, errorText);
