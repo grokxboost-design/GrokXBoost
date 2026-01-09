@@ -68,9 +68,14 @@ export async function analyzeHandle(
       };
     }
 
+    // Handle other errors with more detail
+    const errorMessage = error instanceof Error
+      ? error.message
+      : String(error);
+
     return {
       success: false,
-      error: "An unexpected error occurred. Please try again.",
+      error: `Error: ${errorMessage}`,
       handle: validation.cleanHandle,
       analysisType,
     };
