@@ -1,7 +1,8 @@
 import { GrokAPIRequest, GrokAPIResponse, AnalysisType } from "./types";
 import { SYSTEM_PROMPT, buildUserPrompt } from "./prompts";
 
-const GROK_API_URL = "https://api.x.ai/v1/chat/completions";
+// Try /v1/responses endpoint for server-side tool execution
+const GROK_API_URL = "https://api.x.ai/v1/responses";
 const GROK_MODEL = "grok-4-1-fast-reasoning";
 const API_TIMEOUT = 120000; // 120 seconds for agentic calls
 
@@ -31,8 +32,7 @@ export async function analyzeXHandle(
 
   const userPrompt = buildUserPrompt(handle, analysisType, competitorHandle);
 
-  // Using simplified Agent Tools API for server-side X search execution
-  // Simplified { type: "tool_name" } format triggers built-in server-side execution
+  // Using /v1/responses endpoint with simplified tools for server-side execution
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const requestBody: any = {
     model: GROK_MODEL,
@@ -41,16 +41,9 @@ export async function analyzeXHandle(
       { role: "user", content: userPrompt },
     ],
     tools: [
-      // Built-in X search tools (server-side execution)
-      { type: "x_user_search" },
-      { type: "x_keyword_search" },
-      { type: "x_semantic_search" },
-      { type: "x_thread_fetch" },
-      // Web search fallback
+      { type: "x_search" },
       { type: "web_search" },
     ],
-    tool_choice: "auto",
-    stream: false,
   };
 
   const controller = new AbortController();
@@ -97,22 +90,26 @@ export async function analyzeXHandle(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data: any = await response.json();
 
-    if (!data.choices || data.choices.length === 0) {
-      throw new GrokAPIError(
-        `No choices in response: ${JSON.stringify(data).slice(0, 500)}`
-      );
+    // Handle different response formats (/v1/responses vs /v1/chat/completions)
+    let content: string | null = null;
+
+    // Try /v1/responses format first (output field)
+    if (data.output) {
+      content = data.output;
+    }
+    // Try /v1/chat/completions format (choices array)
+    else if (data.choices && data.choices.length > 0) {
+      content = data.choices[0].message?.content;
+    }
+    // Try direct content field
+    else if (data.content) {
+      content = data.content;
     }
 
-    const message = data.choices[0].message;
-    const content = message?.content;
-
-    // If model made tool calls, it might not have content yet
-    // For server-side tools, xAI should handle this automatically
-    // But let's show what we got for debugging
     if (!content) {
-      const debugInfo = JSON.stringify(data.choices[0]).slice(0, 500);
+      const debugInfo = JSON.stringify(data).slice(0, 800);
       throw new GrokAPIError(
-        `Empty content. Response: ${debugInfo}`
+        `No content in response. Full response: ${debugInfo}`
       );
     }
 
