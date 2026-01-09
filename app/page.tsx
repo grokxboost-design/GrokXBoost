@@ -1,5 +1,6 @@
 import AnalysisForm from "@/components/AnalysisForm";
 import RecentReports from "@/components/RecentReports";
+import YourRecentAnalyses from "@/components/YourRecentAnalyses";
 import ProBanner from "@/components/ProBanner";
 
 export default function Home() {
@@ -81,7 +82,10 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Recent Reports */}
+        {/* Your Recent Analyses (localStorage) */}
+        <YourRecentAnalyses />
+
+        {/* Global Recent Reports (from Redis) */}
         <RecentReports />
 
         {/* Pro Banner with Waitlist */}

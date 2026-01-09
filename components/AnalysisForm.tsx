@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AnalysisType, ANALYSIS_TYPE_LABELS } from "@/lib/types";
 import { analyzeHandle } from "@/app/actions/analyze";
 import ProBanner from "./ProBanner";
+import { saveToPersonalHistory } from "./YourRecentAnalyses";
 
 export default function AnalysisForm() {
   const router = useRouter();
@@ -33,6 +34,7 @@ export default function AnalysisForm() {
       const result = await analyzeHandle(formData);
 
       if (result.success && result.report) {
+        // Save to sessionStorage for immediate page load
         sessionStorage.setItem(
           `report-${result.handle}`,
           JSON.stringify({
@@ -43,6 +45,12 @@ export default function AnalysisForm() {
                 ? competitorHandle
                 : undefined,
           })
+        );
+        // Save to personal history (localStorage)
+        saveToPersonalHistory(
+          result.handle,
+          result.analysisType,
+          analysisType === "competitor-comparison" ? competitorHandle : undefined
         );
         router.push(`/report/${result.handle}`);
       } else {
