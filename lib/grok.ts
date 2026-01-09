@@ -3,7 +3,7 @@ import { SYSTEM_PROMPT, buildUserPrompt } from "./prompts";
 
 // Use standard chat completions endpoint
 const GROK_API_URL = "https://api.x.ai/v1/chat/completions";
-const GROK_MODEL = "grok-2-latest";
+const GROK_MODEL = "grok-beta";
 const API_TIMEOUT = 120000; // 120 seconds for agentic calls
 
 export class GrokAPIError extends Error {
