@@ -1,9 +1,9 @@
 import { GrokAPIRequest, GrokAPIResponse, AnalysisType } from "./types";
 import { SYSTEM_PROMPT, buildUserPrompt } from "./prompts";
 
-// Try /v1/responses endpoint for server-side tool execution
-const GROK_API_URL = "https://api.x.ai/v1/responses";
-const GROK_MODEL = "grok-4-1-fast-reasoning";
+// Use standard chat completions endpoint
+const GROK_API_URL = "https://api.x.ai/v1/chat/completions";
+const GROK_MODEL = "grok-2-latest";
 const API_TIMEOUT = 120000; // 120 seconds for agentic calls
 
 export class GrokAPIError extends Error {
@@ -32,21 +32,17 @@ export async function analyzeXHandle(
 
   const userPrompt = buildUserPrompt(handle, analysisType, competitorHandle);
 
-  // Using /v1/responses endpoint with simplified tools for server-side execution
-  // Note: /v1/responses uses "input" instead of "messages"
+  // Using standard chat completions endpoint
+  // For now, relying on Grok's built-in knowledge without explicit tools
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const requestBody: any = {
     model: GROK_MODEL,
-    input: [
+    messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: userPrompt },
     ],
-    tools: [
-      { type: "x_search" },
-      { type: "web_search" },
-    ],
-    tool_choice: "auto",
-    stream: false,
+    temperature: 0.7,
+    max_tokens: 4096,
   };
 
   const controller = new AbortController();
