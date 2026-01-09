@@ -1,14 +1,13 @@
 import { AnalysisType } from "./types";
 import { SYSTEM_PROMPT, buildUserPrompt } from "./prompts";
 
-// Use standard OpenAI-compatible chat completions endpoint
+// Direct xAI API (fallback when Python service not available)
 const GROK_API_URL = "https://api.x.ai/v1/chat/completions";
 const GROK_MODEL = "grok-3-fast";
 const API_TIMEOUT = 120000; // 120 seconds
 
-// Note: Real-time X search requires xAI Python SDK with server-side tool execution
-// Current implementation uses Grok's trained knowledge (sufficient for launch)
-// Phase 2: Add Python proxy service for real-time x_search when needed
+// Real-time Python service URL (set in Vercel env vars after deploying to Render)
+const REALTIME_API_URL = process.env.REALTIME_API_URL;
 
 export class GrokAPIError extends Error {
   constructor(
@@ -21,7 +20,92 @@ export class GrokAPIError extends Error {
   }
 }
 
+/**
+ * Analyze X handle using real-time Python service (if configured)
+ * Falls back to direct xAI API if service not available
+ */
 export async function analyzeXHandle(
+  handle: string,
+  analysisType: AnalysisType,
+  competitorHandle?: string
+): Promise<string> {
+  // Use real-time service if configured
+  if (REALTIME_API_URL) {
+    return analyzeWithRealtimeService(handle, analysisType, competitorHandle);
+  }
+
+  // Fallback to direct xAI API
+  return analyzeWithDirectAPI(handle, analysisType, competitorHandle);
+}
+
+/**
+ * Real-time analysis via Python service with x_search
+ */
+async function analyzeWithRealtimeService(
+  handle: string,
+  analysisType: AnalysisType,
+  competitorHandle?: string
+): Promise<string> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+
+  try {
+    const response = await fetch(`${REALTIME_API_URL}/analyze`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        handle,
+        analysis_type: analysisType,
+        competitor_handle: competitorHandle || null,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new GrokAPIError(
+        `Real-time service error (${response.status}): ${errorText}`,
+        response.status
+      );
+    }
+
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new GrokAPIError(data.error || "Analysis failed");
+    }
+
+    return data.content;
+  } catch (error) {
+    clearTimeout(timeoutId);
+
+    if (error instanceof GrokAPIError) {
+      throw error;
+    }
+
+    if (error instanceof Error) {
+      if (error.name === "AbortError") {
+        throw new GrokAPIError(
+          "Analysis timed out. Please try again."
+        );
+      }
+      // Fallback to direct API if real-time service fails
+      console.error("Real-time service failed, falling back to direct API:", error.message);
+      return analyzeWithDirectAPI(handle, analysisType, competitorHandle);
+    }
+
+    throw new GrokAPIError("An unexpected error occurred");
+  }
+}
+
+/**
+ * Direct xAI API analysis (no real-time search)
+ */
+async function analyzeWithDirectAPI(
   handle: string,
   analysisType: AnalysisType,
   competitorHandle?: string
