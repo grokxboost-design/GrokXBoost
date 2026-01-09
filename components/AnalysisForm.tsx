@@ -47,8 +47,9 @@ export default function AnalysisForm() {
         setError(result.error || "Failed to analyze handle");
         setIsLoading(false);
       }
-    } catch {
-      setError("An unexpected error occurred. Please try again.");
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(`Error: ${errorMessage}`);
       setIsLoading(false);
     }
   };
