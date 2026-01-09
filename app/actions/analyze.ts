@@ -2,7 +2,7 @@
 
 import { analyzeXHandle, validateHandle, GrokAPIError } from "@/lib/grok";
 import { AnalysisResult, AnalysisType } from "@/lib/types";
-import { storeReport, getReport, isKVConfigured } from "@/lib/kv";
+import { storeReport, getReport, isKVConfigured, trackRecentReport } from "@/lib/kv";
 
 export async function analyzeHandle(
   formData: FormData
@@ -55,12 +55,19 @@ export async function analyzeHandle(
 
     // Store report in KV for persistence (fire and forget, don't block on errors)
     if (isKVConfigured()) {
-      storeReport(
-        validation.cleanHandle,
-        report,
-        analysisType,
-        cleanCompetitorHandle
-      ).catch((err) => {
+      Promise.all([
+        storeReport(
+          validation.cleanHandle,
+          report,
+          analysisType,
+          cleanCompetitorHandle
+        ),
+        trackRecentReport(
+          validation.cleanHandle,
+          analysisType,
+          cleanCompetitorHandle
+        ),
+      ]).catch((err) => {
         console.error("Failed to store report in KV:", err);
       });
     }

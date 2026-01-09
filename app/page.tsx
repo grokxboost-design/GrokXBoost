@@ -1,4 +1,5 @@
 import AnalysisForm from "@/components/AnalysisForm";
+import RecentReports from "@/components/RecentReports";
 
 export default function Home() {
   return (
@@ -78,6 +79,9 @@ export default function Home() {
             </a>
           </div>
         </div>
+
+        {/* Recent Reports */}
+        <RecentReports />
       </div>
     </div>
   );
