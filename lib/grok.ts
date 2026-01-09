@@ -1,10 +1,13 @@
-import { GrokAPIRequest, GrokAPIResponse, AnalysisType } from "./types";
+import { AnalysisType } from "./types";
 import { SYSTEM_PROMPT, buildUserPrompt } from "./prompts";
 
-// Use standard OpenAI-compatible chat completions endpoint
+// Direct xAI API (fallback when Python service not available)
 const GROK_API_URL = "https://api.x.ai/v1/chat/completions";
-const GROK_MODEL = "grok-4-1-fast-reasoning";
+const GROK_MODEL = "grok-3-fast";
 const API_TIMEOUT = 120000; // 120 seconds
+
+// Real-time Python service URL (set in Vercel env vars after deploying to Render)
+const REALTIME_API_URL = process.env.REALTIME_API_URL;
 
 export class GrokAPIError extends Error {
   constructor(
@@ -17,7 +20,92 @@ export class GrokAPIError extends Error {
   }
 }
 
+/**
+ * Analyze X handle using real-time Python service (if configured)
+ * Falls back to direct xAI API if service not available
+ */
 export async function analyzeXHandle(
+  handle: string,
+  analysisType: AnalysisType,
+  competitorHandle?: string
+): Promise<string> {
+  // Use real-time service if configured
+  if (REALTIME_API_URL) {
+    return analyzeWithRealtimeService(handle, analysisType, competitorHandle);
+  }
+
+  // Fallback to direct xAI API
+  return analyzeWithDirectAPI(handle, analysisType, competitorHandle);
+}
+
+/**
+ * Real-time analysis via Python service with x_search
+ */
+async function analyzeWithRealtimeService(
+  handle: string,
+  analysisType: AnalysisType,
+  competitorHandle?: string
+): Promise<string> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+
+  try {
+    const response = await fetch(`${REALTIME_API_URL}/analyze`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        handle,
+        analysis_type: analysisType,
+        competitor_handle: competitorHandle || null,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new GrokAPIError(
+        `Real-time service error (${response.status}): ${errorText}`,
+        response.status
+      );
+    }
+
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new GrokAPIError(data.error || "Analysis failed");
+    }
+
+    return data.content;
+  } catch (error) {
+    clearTimeout(timeoutId);
+
+    if (error instanceof GrokAPIError) {
+      throw error;
+    }
+
+    if (error instanceof Error) {
+      if (error.name === "AbortError") {
+        throw new GrokAPIError(
+          "Analysis timed out. Please try again."
+        );
+      }
+      // Fallback to direct API if real-time service fails
+      console.error("Real-time service failed, falling back to direct API:", error.message);
+      return analyzeWithDirectAPI(handle, analysisType, competitorHandle);
+    }
+
+    throw new GrokAPIError("An unexpected error occurred");
+  }
+}
+
+/**
+ * Direct xAI API analysis (no real-time search)
+ */
+async function analyzeWithDirectAPI(
   handle: string,
   analysisType: AnalysisType,
   competitorHandle?: string
@@ -32,11 +120,7 @@ export async function analyzeXHandle(
 
   const userPrompt = buildUserPrompt(handle, analysisType, competitorHandle);
 
-  // Using standard chat completions endpoint (OpenAI-compatible)
-  // Note: No real-time X search - uses Grok's trained knowledge + reasoning
-  // For real-time X data, need to use xAI Python SDK with x_search() tool
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const requestBody: any = {
+  const requestBody = {
     model: GROK_MODEL,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
@@ -75,7 +159,6 @@ export async function analyzeXHandle(
       } else if (response.status >= 500) {
         errorMessage += "Grok API is temporarily unavailable. Please try again.";
       } else {
-        // Show actual error for debugging
         try {
           const parsed = JSON.parse(errorText);
           errorMessage += parsed.error?.message || errorText.slice(0, 200);
@@ -90,7 +173,6 @@ export async function analyzeXHandle(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data: any = await response.json();
 
-    // Parse standard OpenAI chat completions response format
     const content = data.choices?.[0]?.message?.content ?? "";
 
     if (!content) {
@@ -126,18 +208,15 @@ export function validateHandle(handle: string): {
   cleanHandle: string;
   error?: string;
 } {
-  // Remove @ if present
   let cleanHandle = handle.trim();
   if (cleanHandle.startsWith("@")) {
     cleanHandle = cleanHandle.slice(1);
   }
 
-  // Check if empty
   if (!cleanHandle) {
     return { valid: false, cleanHandle: "", error: "Please enter an X handle" };
   }
 
-  // Check length (X handles are 1-15 characters)
   if (cleanHandle.length > 15) {
     return {
       valid: false,
@@ -146,7 +225,6 @@ export function validateHandle(handle: string): {
     };
   }
 
-  // Check format (alphanumeric and underscores only)
   const handleRegex = /^[a-zA-Z0-9_]+$/;
   if (!handleRegex.test(cleanHandle)) {
     return {
