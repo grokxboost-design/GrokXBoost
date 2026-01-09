@@ -123,7 +123,8 @@ body {
 }
 
 .markdown-content ol {
-  @apply mb-6 space-y-2 pl-0 list-none counter-reset-[item];
+  @apply mb-6 space-y-2 pl-0 list-none;
+  counter-reset: item;
 }
 
 .markdown-content li {
