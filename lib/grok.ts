@@ -2,7 +2,7 @@ import { GrokAPIRequest, GrokAPIResponse, AnalysisType } from "./types";
 import { SYSTEM_PROMPT, buildUserPrompt } from "./prompts";
 
 const GROK_API_URL = "https://api.x.ai/v1/chat/completions";
-const GROK_MODEL = "grok-2";
+const GROK_MODEL = "grok-4-1-fast-reasoning";
 const API_TIMEOUT = 120000; // 120 seconds for agentic calls
 
 export class GrokAPIError extends Error {
