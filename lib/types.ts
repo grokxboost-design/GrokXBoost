@@ -23,9 +23,18 @@ export interface GrokMessage {
   content: string;
 }
 
-export interface GrokTool {
-  type: "x_search" | "web_search";
+export interface GrokFunctionTool {
+  type: "function";
+  function: {
+    name: string;
+    parameters: {
+      type: string;
+      properties: Record<string, unknown>;
+    };
+  };
 }
+
+export type GrokTool = GrokFunctionTool;
 
 export interface GrokAPIRequest {
   model: string;

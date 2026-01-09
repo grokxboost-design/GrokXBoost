@@ -39,9 +39,35 @@ export async function analyzeXHandle(
     ],
     tools: [
       {
-        type: "live_search",
-        live_search: {
-          sources: ["x", "web"],
+        type: "function",
+        function: {
+          name: "x_search",
+          parameters: {
+            type: "object",
+            properties: {
+              allowed_x_handles: {
+                type: "array",
+                items: { type: "string" },
+              },
+              from_date: { type: "string" },
+              to_date: { type: "string" },
+            },
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "web_search",
+          parameters: {
+            type: "object",
+            properties: {
+              allowed_domains: {
+                type: "array",
+                items: { type: "string" },
+              },
+            },
+          },
         },
       },
     ],
