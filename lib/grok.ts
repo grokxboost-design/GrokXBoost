@@ -31,7 +31,8 @@ export async function analyzeXHandle(
 
   const userPrompt = buildUserPrompt(handle, analysisType, competitorHandle);
 
-  // Using agentic tools API for server-side X search execution
+  // Using simplified Agent Tools API for server-side X search execution
+  // Simplified { type: "tool_name" } format triggers built-in server-side execution
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const requestBody: any = {
     model: GROK_MODEL,
@@ -40,102 +41,16 @@ export async function analyzeXHandle(
       { role: "user", content: userPrompt },
     ],
     tools: [
-      {
-        type: "function",
-        function: {
-          name: "x_keyword_search",
-          description: "Advanced search tool for X Posts.",
-          parameters: {
-            type: "object",
-            properties: {
-              query: {
-                type: "string",
-                description: "The search query string for X advanced search.",
-              },
-              limit: {
-                type: "integer",
-                description: "The number of posts to return. Default: 10",
-              },
-              mode: {
-                type: "string",
-                enum: ["Top", "Latest"],
-                description: "Sort by Top or Latest. Default: Top",
-              },
-            },
-            required: ["query"],
-          },
-        },
-      },
-      {
-        type: "function",
-        function: {
-          name: "x_semantic_search",
-          description: "Fetch X posts that are relevant to a semantic search query.",
-          parameters: {
-            type: "object",
-            properties: {
-              query: {
-                type: "string",
-                description: "A semantic search query to find relevant related posts",
-              },
-              limit: {
-                type: "integer",
-                description: "Number of posts to return. Default: 10",
-              },
-              usernames: {
-                type: "array",
-                items: { type: "string" },
-                description: "Optional: Filter to only include these usernames.",
-              },
-            },
-            required: ["query"],
-          },
-        },
-      },
-      {
-        type: "function",
-        function: {
-          name: "x_user_search",
-          description: "Search for an X user given a search query.",
-          parameters: {
-            type: "object",
-            properties: {
-              query: {
-                type: "string",
-                description: "The name or account you are searching for",
-              },
-              count: {
-                type: "integer",
-                description: "Number of users to return. Default: 3",
-              },
-            },
-            required: ["query"],
-          },
-        },
-      },
-      {
-        type: "function",
-        function: {
-          name: "web_search",
-          description: "Search the web for information.",
-          parameters: {
-            type: "object",
-            properties: {
-              query: {
-                type: "string",
-                description: "The search query to look up on the web.",
-              },
-              num_results: {
-                type: "integer",
-                description: "The number of results to return. Default: 10",
-              },
-            },
-            required: ["query"],
-          },
-        },
-      },
+      // Built-in X search tools (server-side execution)
+      { type: "x_user_search" },
+      { type: "x_keyword_search" },
+      { type: "x_semantic_search" },
+      { type: "x_thread_fetch" },
+      // Web search fallback
+      { type: "web_search" },
     ],
     tool_choice: "auto",
+    stream: false,
   };
 
   const controller = new AbortController();
