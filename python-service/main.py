@@ -163,13 +163,21 @@ async def analyze(request: AnalyzeRequest):
                         {"role": "user", "content": prompt},
                     ],
                     "max_tokens": 4096,
+                    "search_parameters": {
+                        "mode": "auto",
+                        "sources": [
+                            {"type": "x_posts"},
+                            {"type": "web"}
+                        ]
+                    }
                 },
             )
 
         if response.status_code != 200:
+            error_detail = response.text[:500] if response.text else "No details"
             return AnalyzeResponse(
                 success=False,
-                error=f"API error: {response.status_code}"
+                error=f"API error ({response.status_code}): {error_detail}"
             )
 
         data = response.json()
