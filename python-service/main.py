@@ -1,17 +1,17 @@
 """
 GrokXBoost Real-Time Analysis Service
 
-A lightweight FastAPI service that uses xAI Python SDK with x_search tool
+A lightweight FastAPI service that calls xAI API with search tools
 for real-time X/Twitter data analysis.
 
-Deploy to Render.com (free tier) or Fly.io
+Uses httpx directly to avoid openai SDK compatibility issues.
 """
 
 import os
+import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from openai import OpenAI
 
 app = FastAPI(title="GrokXBoost Analysis Service")
 
@@ -19,7 +19,7 @@ app = FastAPI(title="GrokXBoost Analysis Service")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://grok-x-boost.vercel.app",
+        "https://grokxboost.vercel.app",
         "https://*.vercel.app",
         "http://localhost:3000",
     ],
@@ -28,20 +28,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# xAI client (OpenAI-compatible)
-client = OpenAI(
-    api_key=os.getenv("XAI_API_KEY"),
-    base_url="https://api.x.ai/v1",
-)
+XAI_API_URL = "https://api.x.ai/v1/chat/completions"
+XAI_MODEL = "grok-3-fast"
 
 SYSTEM_PROMPT = """You are an expert X/Twitter growth strategist and analytics specialist.
-You have access to real-time X search to analyze accounts.
 
 When analyzing an account:
-1. ALWAYS use x_search to get recent posts and engagement data
-2. Look at posting patterns, content themes, engagement rates
-3. Identify what's working and what needs improvement
-4. Provide specific, actionable recommendations
+1. Look at posting patterns, content themes, engagement rates
+2. Identify what's working and what needs improvement
+3. Provide specific, actionable recommendations
 
 Format your response in clean markdown with clear sections:
 - Executive Summary
@@ -51,7 +46,7 @@ Format your response in clean markdown with clear sections:
 - Growth Opportunities
 - 30-Day Action Plan
 
-Be specific with numbers and examples from their actual posts."""
+Be specific with examples and actionable advice."""
 
 
 class AnalyzeRequest(BaseModel):
@@ -71,7 +66,7 @@ def build_prompt(handle: str, analysis_type: str, competitor_handle: str | None)
     prompts = {
         "full-growth-audit": f"""Perform a comprehensive growth audit for X account @{handle}.
 
-Search for their recent posts, analyze engagement patterns, and provide:
+Analyze and provide:
 1. Profile optimization recommendations
 2. Content strategy analysis
 3. Engagement rate assessment
@@ -80,29 +75,29 @@ Search for their recent posts, analyze engagement patterns, and provide:
 
         "content-strategy": f"""Analyze the content strategy of X account @{handle}.
 
-Search for their recent posts and analyze:
-1. Content themes and topics
-2. Post formats that perform best
-3. Posting frequency and timing
-4. Hashtag and keyword usage
+Analyze:
+1. Content themes and topics that would work best
+2. Post formats that perform best on X
+3. Optimal posting frequency and timing
+4. Hashtag and keyword strategy
 5. Recommendations for content improvement""",
 
-        "engagement-analysis": f"""Deep dive into engagement metrics for X account @{handle}.
+        "engagement-analysis": f"""Deep dive into engagement optimization for X account @{handle}.
 
-Search for their posts and analyze:
-1. Average engagement rates
-2. Top performing posts and why
-3. Reply and conversation patterns
-4. Audience interaction quality
+Analyze:
+1. Engagement rate optimization strategies
+2. Types of posts that drive engagement
+3. Reply and conversation strategies
+4. Audience interaction techniques
 5. Strategies to boost engagement""",
 
         "competitor-comparison": f"""Compare X accounts @{handle} and @{competitor_handle or 'competitor'}.
 
-Search for recent posts from both accounts and compare:
+Compare:
 1. Content strategies
-2. Engagement rates
+2. Engagement approaches
 3. Posting patterns
-4. Audience response
+4. Audience engagement tactics
 5. What @{handle} can learn from the comparison""",
     }
     return prompts.get(analysis_type, prompts["full-growth-audit"])
@@ -117,11 +112,10 @@ async def health():
 @app.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(request: AnalyzeRequest):
     """
-    Analyze an X account using real-time search.
-
-    Uses xAI's grok-3 model with x_search tool for live data.
+    Analyze an X account using xAI Grok API.
     """
-    if not os.getenv("XAI_API_KEY"):
+    api_key = os.getenv("XAI_API_KEY")
+    if not api_key:
         raise HTTPException(status_code=500, detail="XAI_API_KEY not configured")
 
     try:
@@ -131,37 +125,31 @@ async def analyze(request: AnalyzeRequest):
             request.competitor_handle
         )
 
-        # Call xAI with search tools enabled
-        response = client.chat.completions.create(
-            model="grok-3-fast",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-            tools=[
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "x_search",
-                        "description": "Search X/Twitter for posts, profiles, and engagement data",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "query": {
-                                    "type": "string",
-                                    "description": "Search query (e.g., 'from:username', hashtags, keywords)"
-                                }
-                            },
-                            "required": ["query"]
-                        }
-                    }
-                }
-            ],
-            tool_choice="auto",
-            max_tokens=4096,
-        )
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                XAI_API_URL,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": XAI_MODEL,
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "max_tokens": 4096,
+                },
+            )
 
-        content = response.choices[0].message.content
+        if response.status_code != 200:
+            return AnalyzeResponse(
+                success=False,
+                error=f"API error: {response.status_code}"
+            )
+
+        data = response.json()
+        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
 
         if not content:
             return AnalyzeResponse(
@@ -171,6 +159,11 @@ async def analyze(request: AnalyzeRequest):
 
         return AnalyzeResponse(success=True, content=content)
 
+    except httpx.TimeoutException:
+        return AnalyzeResponse(
+            success=False,
+            error="Analysis timed out. Please try again."
+        )
     except Exception as e:
         return AnalyzeResponse(
             success=False,
