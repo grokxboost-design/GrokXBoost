@@ -81,3 +81,47 @@ export async function getLatestReport(
 export function isKVConfigured(): boolean {
   return !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 }
+
+// Track a report in the recent reports list
+export async function trackRecentReport(
+  handle: string,
+  analysisType: AnalysisType,
+  competitorHandle?: string
+): Promise<void> {
+  const normalizedHandle = handle.toLowerCase().replace(/^@/, "");
+  const entry = {
+    handle: normalizedHandle,
+    analysisType,
+    competitorHandle,
+    createdAt: new Date().toISOString(),
+  };
+
+  // Get current recent reports list
+  const recentKey = "recent:reports";
+  const recent = await kv.get<typeof entry[]>(recentKey) || [];
+
+  // Remove any existing entry for this handle (to avoid duplicates)
+  const filtered = recent.filter((r) => r.handle !== normalizedHandle);
+
+  // Add new entry at the beginning
+  filtered.unshift(entry);
+
+  // Keep only the 20 most recent
+  const trimmed = filtered.slice(0, 20);
+
+  // Store with 90-day TTL
+  await kv.set(recentKey, trimmed, { ex: 7776000 });
+}
+
+// Get recent reports list
+export async function getRecentReports(): Promise<
+  Array<{
+    handle: string;
+    analysisType: AnalysisType;
+    competitorHandle?: string;
+    createdAt: string;
+  }>
+> {
+  const recentKey = "recent:reports";
+  return (await kv.get(recentKey)) || [];
+}
