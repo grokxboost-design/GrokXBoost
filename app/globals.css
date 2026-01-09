@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #000000;
+  --foreground: #e7e9ea;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+}
+
+/* Custom scrollbar for dark mode */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #16181c;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2f3336;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #404549;
+}
+
+/* Markdown styling for reports */
+.markdown-content h2 {
+  @apply text-xl font-bold mt-6 mb-3 text-white;
+}
+
+.markdown-content p {
+  @apply mb-4 leading-relaxed;
+}
+
+.markdown-content ul {
+  @apply list-disc list-inside mb-4 space-y-2;
+}
+
+.markdown-content ol {
+  @apply list-decimal list-inside mb-4 space-y-2;
+}
+
+.markdown-content li {
+  @apply leading-relaxed;
+}
+
+.markdown-content strong {
+  @apply font-semibold text-white;
+}
+
+.markdown-content em {
+  @apply italic;
+}
+
+.markdown-content blockquote {
+  @apply border-l-4 border-blue-500 pl-4 italic my-4 text-gray-400;
+}
+
+.markdown-content code {
+  @apply bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono;
+}
+
+.markdown-content pre {
+  @apply bg-gray-800 p-4 rounded-lg overflow-x-auto mb-4;
+}
+
+.markdown-content pre code {
+  @apply bg-transparent p-0;
+}
+
+.markdown-content a {
+  @apply text-blue-400 hover:underline;
+}
+
+/* Gradient button */
+.btn-gradient {
+  @apply bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700;
+}
+
+/* Loading animation */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.6);
+  }
+}
+
+.loading-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Skeleton loading animation */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
