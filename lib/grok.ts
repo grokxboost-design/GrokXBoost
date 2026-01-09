@@ -1,10 +1,13 @@
-import { GrokAPIRequest, GrokAPIResponse, AnalysisType } from "./types";
+import { AnalysisType } from "./types";
 import { SYSTEM_PROMPT, buildUserPrompt } from "./prompts";
 
 // Use standard OpenAI-compatible chat completions endpoint
 const GROK_API_URL = "https://api.x.ai/v1/chat/completions";
-const GROK_MODEL = "grok-4-1-fast-reasoning";
+const GROK_MODEL = "grok-3-fast";
 const API_TIMEOUT = 120000; // 120 seconds
+
+// Enable real-time X search (set to false to use static knowledge only)
+const USE_REALTIME_SEARCH = process.env.USE_REALTIME_SEARCH !== "false";
 
 export class GrokAPIError extends Error {
   constructor(
@@ -32,9 +35,6 @@ export async function analyzeXHandle(
 
   const userPrompt = buildUserPrompt(handle, analysisType, competitorHandle);
 
-  // Using standard chat completions endpoint (OpenAI-compatible)
-  // Note: No real-time X search - uses Grok's trained knowledge + reasoning
-  // For real-time X data, need to use xAI Python SDK with x_search() tool
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const requestBody: any = {
     model: GROK_MODEL,
@@ -45,6 +45,30 @@ export async function analyzeXHandle(
     stream: false,
     max_tokens: 4096,
   };
+
+  // Enable real-time X search if configured
+  if (USE_REALTIME_SEARCH) {
+    requestBody.tools = [
+      {
+        type: "function",
+        function: {
+          name: "x_search",
+          description: "Search X/Twitter for real-time posts, profiles, engagement data, and trends. Use this to get current information about any X account or topic.",
+          parameters: {
+            type: "object",
+            properties: {
+              query: {
+                type: "string",
+                description: "The search query - can be a username (from:username), hashtag, or keywords",
+              },
+            },
+            required: ["query"],
+          },
+        },
+      },
+    ];
+    requestBody.tool_choice = "auto";
+  }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
