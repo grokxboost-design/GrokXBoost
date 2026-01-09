@@ -42,10 +42,7 @@ export async function analyzeXHandle(
       { role: "user", content: userPrompt },
     ],
     tools: [
-      { type: "x_user_search" },
-      { type: "x_keyword_search" },
-      { type: "x_semantic_search" },
-      { type: "x_thread_fetch" },
+      { type: "x_search" },
       { type: "web_search" },
     ],
     tool_choice: "auto",
