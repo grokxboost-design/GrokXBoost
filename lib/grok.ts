@@ -114,16 +114,26 @@ export async function analyzeXHandle(
       throw new GrokAPIError(errorMessage, response.status, errorText);
     }
 
-    const data: GrokAPIResponse = await response.json();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data: any = await response.json();
 
     if (!data.choices || data.choices.length === 0) {
-      throw new GrokAPIError("No response received from Grok API");
+      throw new GrokAPIError(
+        `No choices in response: ${JSON.stringify(data).slice(0, 500)}`
+      );
     }
 
-    const content = data.choices[0].message.content;
+    const message = data.choices[0].message;
+    const content = message?.content;
 
+    // If model made tool calls, it might not have content yet
+    // For server-side tools, xAI should handle this automatically
+    // But let's show what we got for debugging
     if (!content) {
-      throw new GrokAPIError("Empty response received from Grok API");
+      const debugInfo = JSON.stringify(data.choices[0]).slice(0, 500);
+      throw new GrokAPIError(
+        `Empty content. Response: ${debugInfo}`
+      );
     }
 
     return content;
