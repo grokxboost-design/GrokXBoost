@@ -31,46 +31,23 @@ export async function analyzeXHandle(
 
   const userPrompt = buildUserPrompt(handle, analysisType, competitorHandle);
 
-  const requestBody: GrokAPIRequest = {
+  // Using search_parameters for server-side search execution
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const requestBody: any = {
     model: GROK_MODEL,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: userPrompt },
     ],
-    tools: [
-      {
-        type: "function",
-        function: {
-          name: "x_search",
-          parameters: {
-            type: "object",
-            properties: {
-              allowed_x_handles: {
-                type: "array",
-                items: { type: "string" },
-              },
-              from_date: { type: "string" },
-              to_date: { type: "string" },
-            },
-          },
-        },
-      },
-      {
-        type: "function",
-        function: {
-          name: "web_search",
-          parameters: {
-            type: "object",
-            properties: {
-              allowed_domains: {
-                type: "array",
-                items: { type: "string" },
-              },
-            },
-          },
-        },
-      },
-    ],
+    search_parameters: {
+      mode: "auto",
+      return_citations: true,
+      from_date: "2024-01-01",
+      sources: [
+        { type: "x" },
+        { type: "web" },
+      ],
+    },
   };
 
   const controller = new AbortController();
