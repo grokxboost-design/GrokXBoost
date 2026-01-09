@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AnalysisType, ANALYSIS_TYPE_LABELS } from "@/lib/types";
@@ -17,8 +18,12 @@ export default function ReportDisplay({
   analysisType,
   competitorHandle,
 }: ReportDisplayProps) {
+  const [shareUrl, setShareUrl] = useState("");
   const shareText = generateShareText(handle, report);
-  const shareUrl = typeof window !== "undefined" ? window.location.origin : "";
+
+  useEffect(() => {
+    setShareUrl(window.location.origin);
+  }, []);
 
   const handleShareOnX = () => {
     const tweetText = encodeURIComponent(shareText);
