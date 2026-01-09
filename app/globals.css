@@ -2,9 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   DESIGN SYSTEM - CSS VARIABLES
+   ============================================ */
 :root {
+  /* Background Colors */
   --background: #000000;
+  --background-secondary: #0a0a0a;
+  --background-tertiary: #111111;
+  --background-card: #161616;
+  --background-card-hover: #1a1a1a;
+
+  /* Foreground Colors */
   --foreground: #e7e9ea;
+  --foreground-muted: #9ca3af;
+  --foreground-subtle: #6b7280;
+
+  /* Brand Colors */
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+  --primary-muted: rgba(59, 130, 246, 0.15);
+  --secondary: #8b5cf6;
+  --secondary-hover: #7c3aed;
+  --accent: #06b6d4;
+
+  /* Status Colors */
+  --success: #22c55e;
+  --success-muted: rgba(34, 197, 94, 0.15);
+  --warning: #f59e0b;
+  --warning-muted: rgba(245, 158, 11, 0.15);
+  --danger: #ef4444;
+  --danger-muted: rgba(239, 68, 68, 0.15);
+
+  /* Border Colors */
+  --border: #27272a;
+  --border-hover: #3f3f46;
+  --border-accent: #3b82f6;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.3);
 }
 
 body {
@@ -12,81 +51,316 @@ body {
   background: var(--background);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     Helvetica, Arial, sans-serif;
+  line-height: 1.6;
 }
 
-/* Custom scrollbar for dark mode */
+/* ============================================
+   SCROLLBAR STYLING
+   ============================================ */
 ::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #16181c;
+  background: var(--background-secondary);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2f3336;
+  background: var(--border);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #404549;
+  background: var(--border-hover);
 }
 
-/* Markdown styling for reports */
+/* ============================================
+   TYPOGRAPHY - MARKDOWN CONTENT
+   ============================================ */
+.markdown-content {
+  @apply text-gray-300;
+}
+
+/* Headings */
+.markdown-content h1 {
+  @apply text-3xl font-bold mt-8 mb-4 text-white pb-3 border-b border-gray-800;
+}
+
 .markdown-content h2 {
-  @apply text-xl font-bold mt-6 mb-3 text-white;
+  @apply text-2xl font-bold mt-8 mb-4 text-white flex items-center gap-3;
 }
 
+.markdown-content h2::before {
+  content: "";
+  @apply w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full;
+}
+
+.markdown-content h3 {
+  @apply text-xl font-semibold mt-6 mb-3 text-gray-100;
+}
+
+.markdown-content h4 {
+  @apply text-lg font-semibold mt-5 mb-2 text-gray-200;
+}
+
+.markdown-content h5 {
+  @apply text-base font-semibold mt-4 mb-2 text-gray-300;
+}
+
+.markdown-content h6 {
+  @apply text-sm font-semibold mt-4 mb-2 text-gray-400 uppercase tracking-wide;
+}
+
+/* Paragraphs */
 .markdown-content p {
-  @apply mb-4 leading-relaxed;
+  @apply mb-4 leading-relaxed text-gray-300;
 }
 
+/* Lists */
 .markdown-content ul {
-  @apply list-disc list-inside mb-4 space-y-2;
+  @apply mb-6 space-y-2 pl-0;
 }
 
 .markdown-content ol {
-  @apply list-decimal list-inside mb-4 space-y-2;
+  @apply mb-6 space-y-2 pl-0 list-none counter-reset-[item];
 }
 
 .markdown-content li {
-  @apply leading-relaxed;
+  @apply leading-relaxed pl-6 relative;
 }
 
+.markdown-content ul > li::before {
+  content: "";
+  @apply absolute left-0 top-[0.6rem] w-2 h-2 rounded-full bg-blue-500/60;
+}
+
+.markdown-content ol > li {
+  counter-increment: item;
+}
+
+.markdown-content ol > li::before {
+  content: counter(item) ".";
+  @apply absolute left-0 text-blue-400 font-semibold;
+}
+
+/* Nested lists */
+.markdown-content li ul,
+.markdown-content li ol {
+  @apply mt-2 mb-0;
+}
+
+.markdown-content li ul > li::before {
+  @apply bg-purple-500/60 w-1.5 h-1.5;
+}
+
+/* Text formatting */
 .markdown-content strong {
   @apply font-semibold text-white;
 }
 
 .markdown-content em {
-  @apply italic;
+  @apply italic text-gray-200;
 }
 
+/* Blockquotes */
 .markdown-content blockquote {
-  @apply border-l-4 border-blue-500 pl-4 italic my-4 text-gray-400;
+  @apply border-l-4 border-blue-500 pl-4 py-2 my-6 bg-blue-500/5 rounded-r-lg;
 }
 
+.markdown-content blockquote p {
+  @apply text-gray-300 italic mb-0;
+}
+
+/* Code */
 .markdown-content code {
-  @apply bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono;
+  @apply bg-gray-800/80 text-cyan-400 px-2 py-1 rounded text-sm font-mono;
 }
 
 .markdown-content pre {
-  @apply bg-gray-800 p-4 rounded-lg overflow-x-auto mb-4;
+  @apply bg-gray-900 border border-gray-800 p-4 rounded-xl overflow-x-auto mb-6 mt-4;
 }
 
 .markdown-content pre code {
-  @apply bg-transparent p-0;
+  @apply bg-transparent p-0 text-gray-300;
 }
 
+/* Links */
 .markdown-content a {
-  @apply text-blue-400 hover:underline;
+  @apply text-blue-400 hover:text-blue-300 underline underline-offset-2 transition-colors;
 }
 
-/* Gradient button */
+/* Horizontal Rule */
+.markdown-content hr {
+  @apply my-8 border-0 h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent;
+}
+
+/* Tables */
+.markdown-content table {
+  @apply w-full mb-6 border-collapse;
+}
+
+.markdown-content thead {
+  @apply bg-gray-800/50;
+}
+
+.markdown-content th {
+  @apply px-4 py-3 text-left text-sm font-semibold text-gray-200 border-b border-gray-700;
+}
+
+.markdown-content td {
+  @apply px-4 py-3 text-sm border-b border-gray-800;
+}
+
+.markdown-content tbody tr:hover {
+  @apply bg-gray-800/30;
+}
+
+/* Images */
+.markdown-content img {
+  @apply rounded-xl max-w-full h-auto my-4;
+}
+
+/* ============================================
+   REPORT CARDS & SECTIONS
+   ============================================ */
+.report-card {
+  @apply bg-[var(--background-card)] border border-[var(--border)] rounded-2xl p-6
+         transition-all duration-200 hover:border-[var(--border-hover)];
+}
+
+.report-card-highlight {
+  @apply bg-gradient-to-br from-blue-500/10 to-purple-500/10
+         border border-blue-500/20 rounded-2xl p-6;
+}
+
+.report-section {
+  @apply mb-8;
+}
+
+.report-section-title {
+  @apply text-xl font-bold text-white mb-4 flex items-center gap-3;
+}
+
+.report-section-title::before {
+  content: "";
+  @apply w-1 h-5 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full;
+}
+
+/* ============================================
+   METRIC CARDS
+   ============================================ */
+.metric-card {
+  @apply bg-[var(--background-card)] border border-[var(--border)] rounded-xl p-5
+         transition-all duration-200 hover:shadow-lg hover:border-[var(--border-hover)];
+}
+
+.metric-label {
+  @apply text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2;
+}
+
+.metric-value {
+  @apply text-3xl font-bold text-white;
+}
+
+.metric-change {
+  @apply text-sm font-medium mt-2 flex items-center gap-1;
+}
+
+.metric-change-positive {
+  @apply text-green-400;
+}
+
+.metric-change-negative {
+  @apply text-red-400;
+}
+
+/* ============================================
+   ACTION ITEMS
+   ============================================ */
+.action-item {
+  @apply flex items-start gap-4 p-4 rounded-xl border transition-all duration-200;
+}
+
+.action-item-high {
+  @apply bg-red-500/10 border-red-500/30 hover:bg-red-500/15;
+}
+
+.action-item-medium {
+  @apply bg-yellow-500/10 border-yellow-500/30 hover:bg-yellow-500/15;
+}
+
+.action-item-low {
+  @apply bg-gray-500/10 border-gray-500/30 hover:bg-gray-500/15;
+}
+
+.action-badge {
+  @apply w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0;
+}
+
+.action-badge-high {
+  @apply bg-red-500;
+}
+
+.action-badge-medium {
+  @apply bg-yellow-500;
+}
+
+.action-badge-low {
+  @apply bg-gray-500;
+}
+
+/* ============================================
+   BUTTONS
+   ============================================ */
 .btn-gradient {
-  @apply bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700;
+  @apply bg-gradient-to-r from-blue-500 to-purple-600
+         hover:from-blue-600 hover:to-purple-700
+         transition-all duration-200;
 }
 
-/* Loading animation */
+.btn-secondary {
+  @apply bg-gray-800 border border-gray-700 text-white
+         hover:bg-gray-700 hover:border-gray-600
+         transition-all duration-200;
+}
+
+.btn-ghost {
+  @apply bg-transparent border border-gray-700 text-gray-300
+         hover:bg-gray-800 hover:text-white hover:border-gray-600
+         transition-all duration-200;
+}
+
+/* ============================================
+   INTERACTIVE ELEMENTS
+   ============================================ */
+.expandable-section {
+  @apply rounded-xl overflow-hidden border border-[var(--border)]
+         bg-[var(--background-card)] transition-all duration-200;
+}
+
+.expandable-header {
+  @apply w-full px-5 py-4 flex items-center justify-between text-left
+         hover:bg-[var(--background-card-hover)] transition-colors cursor-pointer;
+}
+
+.expandable-content {
+  @apply px-5 pb-5 border-t border-[var(--border)];
+}
+
+.copy-button {
+  @apply inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg
+         bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white
+         transition-all duration-200 border border-gray-700;
+}
+
+.copy-button-success {
+  @apply bg-green-600 text-white border-green-600;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
 @keyframes pulse-glow {
   0%, 100% {
     box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
@@ -100,7 +374,6 @@ body {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* Skeleton loading animation */
 @keyframes shimmer {
   0% {
     background-position: -200% 0;
@@ -114,4 +387,86 @@ body {
   background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out;
+}
+
+/* Staggered animation delays */
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+
+/* ============================================
+   TOOLTIPS
+   ============================================ */
+.tooltip {
+  @apply relative;
+}
+
+.tooltip::after {
+  content: attr(data-tooltip);
+  @apply absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5
+         text-xs text-white bg-gray-900 rounded-lg whitespace-nowrap
+         opacity-0 invisible transition-all duration-200 pointer-events-none
+         border border-gray-700;
+}
+
+.tooltip:hover::after {
+  @apply opacity-100 visible;
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+
+  .report-card,
+  .metric-card {
+    border: 1px solid #ddd;
+    background: white;
+  }
+
+  .btn-gradient,
+  .btn-secondary,
+  .copy-button {
+    display: none;
+  }
+
+  .markdown-content h2::before,
+  .report-section-title::before {
+    display: none;
+  }
 }

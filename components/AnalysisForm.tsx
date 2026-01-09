@@ -30,7 +30,6 @@ export default function AnalysisForm() {
       const result = await analyzeHandle(formData);
 
       if (result.success && result.report) {
-        // Store report in sessionStorage for the report page
         sessionStorage.setItem(
           `report-${result.handle}`,
           JSON.stringify({
@@ -57,100 +56,110 @@ export default function AnalysisForm() {
   const showCompetitorInput = analysisType === "competitor-comparison";
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-md space-y-6">
-      {/* Handle Input */}
-      <div>
-        <label
-          htmlFor="handle"
-          className="block text-sm font-medium text-gray-300 mb-2"
-        >
-          X Handle
-        </label>
-        <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
-            @
-          </span>
-          <input
-            type="text"
-            id="handle"
-            name="handle"
-            value={handle}
-            onChange={(e) => setHandle(e.target.value)}
-            placeholder="username"
-            disabled={isLoading}
-            className="w-full bg-gray-900 border border-gray-700 rounded-xl py-3 pl-10 pr-4
-                     text-white placeholder-gray-500 focus:outline-none focus:border-blue-500
-                     focus:ring-1 focus:ring-blue-500 transition-colors disabled:opacity-50"
-          />
-        </div>
-      </div>
-
-      {/* Analysis Type Selector */}
-      <div>
-        <label
-          htmlFor="analysisType"
-          className="block text-sm font-medium text-gray-300 mb-2"
-        >
-          Analysis Type
-        </label>
-        <select
-          id="analysisType"
-          name="analysisType"
-          value={analysisType}
-          onChange={(e) => setAnalysisType(e.target.value as AnalysisType)}
-          disabled={isLoading}
-          className="w-full bg-gray-900 border border-gray-700 rounded-xl py-3 px-4
-                   text-white focus:outline-none focus:border-blue-500
-                   focus:ring-1 focus:ring-blue-500 transition-colors disabled:opacity-50
-                   appearance-none cursor-pointer"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
-            backgroundRepeat: "no-repeat",
-            backgroundPosition: "right 1rem center",
-            backgroundSize: "1.5rem",
-          }}
-        >
-          {Object.entries(ANALYSIS_TYPE_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Competitor Handle Input (conditional) */}
-      {showCompetitorInput && (
-        <div className="animate-in slide-in-from-top-2 duration-200">
+    <form onSubmit={handleSubmit} className="w-full space-y-5">
+      {/* Form Card */}
+      <div className="report-card space-y-5">
+        {/* Handle Input */}
+        <div>
           <label
-            htmlFor="competitorHandle"
+            htmlFor="handle"
             className="block text-sm font-medium text-gray-300 mb-2"
           >
-            Competitor Handle
+            X Handle
           </label>
           <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
               @
             </span>
             <input
               type="text"
-              id="competitorHandle"
-              name="competitorHandle"
-              value={competitorHandle}
-              onChange={(e) => setCompetitorHandle(e.target.value)}
-              placeholder="competitor"
+              id="handle"
+              name="handle"
+              value={handle}
+              onChange={(e) => setHandle(e.target.value)}
+              placeholder="username"
               disabled={isLoading}
-              className="w-full bg-gray-900 border border-gray-700 rounded-xl py-3 pl-10 pr-4
-                       text-white placeholder-gray-500 focus:outline-none focus:border-blue-500
-                       focus:ring-1 focus:ring-blue-500 transition-colors disabled:opacity-50"
+              className="w-full bg-gray-900/50 border border-gray-700 rounded-xl py-3.5 pl-10 pr-4
+                       text-white placeholder-gray-500
+                       focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20
+                       transition-all duration-200 disabled:opacity-50"
             />
           </div>
         </div>
-      )}
+
+        {/* Analysis Type Selector */}
+        <div>
+          <label
+            htmlFor="analysisType"
+            className="block text-sm font-medium text-gray-300 mb-2"
+          >
+            Analysis Type
+          </label>
+          <div className="relative">
+            <select
+              id="analysisType"
+              name="analysisType"
+              value={analysisType}
+              onChange={(e) => setAnalysisType(e.target.value as AnalysisType)}
+              disabled={isLoading}
+              className="w-full bg-gray-900/50 border border-gray-700 rounded-xl py-3.5 px-4
+                       text-white appearance-none cursor-pointer
+                       focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20
+                       transition-all duration-200 disabled:opacity-50"
+            >
+              {Object.entries(ANALYSIS_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value} className="bg-gray-900">
+                  {label}
+                </option>
+              ))}
+            </select>
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Competitor Handle Input (conditional) */}
+        {showCompetitorInput && (
+          <div className="animate-fade-in">
+            <label
+              htmlFor="competitorHandle"
+              className="block text-sm font-medium text-gray-300 mb-2"
+            >
+              Competitor Handle
+            </label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
+                @
+              </span>
+              <input
+                type="text"
+                id="competitorHandle"
+                name="competitorHandle"
+                value={competitorHandle}
+                onChange={(e) => setCompetitorHandle(e.target.value)}
+                placeholder="competitor"
+                disabled={isLoading}
+                className="w-full bg-gray-900/50 border border-gray-700 rounded-xl py-3.5 pl-10 pr-4
+                         text-white placeholder-gray-500
+                         focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20
+                         transition-all duration-200 disabled:opacity-50"
+              />
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 text-red-400 text-sm">
-          {error}
+        <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/30 rounded-xl p-4 animate-fade-in">
+          <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-red-400 text-sm">{error}</p>
         </div>
       )}
 
@@ -160,10 +169,11 @@ export default function AnalysisForm() {
         disabled={isLoading || !handle.trim()}
         className="w-full btn-gradient text-white font-semibold py-4 px-6 rounded-xl
                  transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed
-                 hover:shadow-lg hover:shadow-blue-500/25 active:scale-[0.98]"
+                 hover:shadow-lg hover:shadow-blue-500/25 active:scale-[0.98]
+                 flex items-center justify-center gap-2"
       >
         {isLoading ? (
-          <span className="flex items-center justify-center gap-2">
+          <>
             <svg
               className="animate-spin h-5 w-5"
               xmlns="http://www.w3.org/2000/svg"
@@ -184,17 +194,23 @@ export default function AnalysisForm() {
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
             </svg>
-            Analyzing...
-          </span>
+            <span>Analyzing...</span>
+          </>
         ) : (
-          "Analyze My Account"
+          <>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span>Analyze Account</span>
+          </>
         )}
       </button>
 
-      {/* Estimated Time */}
+      {/* Loading Message */}
       {isLoading && (
-        <p className="text-center text-sm text-gray-500">
-          This may take 15-30 seconds for real-time analysis
+        <p className="text-center text-sm text-gray-500 animate-pulse">
+          This may take 15-30 seconds...
         </p>
       )}
     </form>
