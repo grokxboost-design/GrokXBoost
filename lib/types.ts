@@ -25,11 +25,7 @@ export interface GrokMessage {
 
 export interface GrokTool {
   type: "live_search";
-  search_parameters: {
-    mode: string;
-    return_citations: boolean;
-    sources: { type: string }[];
-  };
+  sources: { type: string }[];
 }
 
 export interface GrokAPIRequest {
