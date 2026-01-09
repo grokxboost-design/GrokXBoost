@@ -38,10 +38,8 @@ export async function analyzeXHandle(
       { role: "user", content: userPrompt },
     ],
     tools: [
-      {
-        type: "live_search",
-        sources: ["x", "web"],
-      },
+      { type: "x_search" },
+      { type: "web_search" },
     ],
   };
 

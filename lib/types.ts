@@ -24,8 +24,7 @@ export interface GrokMessage {
 }
 
 export interface GrokTool {
-  type: "live_search";
-  sources: string[];
+  type: "x_search" | "web_search";
 }
 
 export interface GrokAPIRequest {
