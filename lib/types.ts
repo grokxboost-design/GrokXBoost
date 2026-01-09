@@ -16,6 +16,8 @@ export interface AnalysisResult {
   error?: string;
   handle: string;
   analysisType: AnalysisType;
+  rateLimited?: boolean;
+  remaining?: number;
 }
 
 export interface GrokMessage {

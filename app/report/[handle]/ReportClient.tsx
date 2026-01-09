@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ReportDisplay from "@/components/ReportDisplay";
 import LoadingState from "@/components/LoadingState";
+import ProBanner from "@/components/ProBanner";
 import { AnalysisType, ANALYSIS_TYPE_LABELS } from "@/lib/types";
 import { analyzeHandle } from "@/app/actions/analyze";
 
@@ -32,6 +33,7 @@ export default function ReportClient({
   );
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rateLimited, setRateLimited] = useState(false);
   const [selectedType, setSelectedType] = useState<AnalysisType>("full-growth-audit");
   const [newCompetitor, setNewCompetitor] = useState("");
 
@@ -54,6 +56,7 @@ export default function ReportClient({
 
   const handleGenerateReport = async () => {
     setError(null);
+    setRateLimited(false);
     setIsGenerating(true);
 
     const formData = new FormData();
@@ -84,6 +87,9 @@ export default function ReportClient({
         );
       } else {
         setError(result.error || "Failed to generate report");
+        if (result.rateLimited) {
+          setRateLimited(true);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -177,6 +183,11 @@ export default function ReportClient({
             </button>
           </div>
         </div>
+
+        {/* Pro Teaser */}
+        <div className="max-w-4xl mx-auto mt-8">
+          <ProBanner variant="compact" showWaitlist={false} />
+        </div>
       </div>
     );
   }
@@ -209,6 +220,12 @@ export default function ReportClient({
               />
             </svg>
             <p className="text-red-400 text-sm">{error}</p>
+          </div>
+        )}
+
+        {rateLimited && (
+          <div className="mb-6">
+            <ProBanner />
           </div>
         )}
 
