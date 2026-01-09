@@ -1,10 +1,10 @@
 import { GrokAPIRequest, GrokAPIResponse, AnalysisType } from "./types";
 import { SYSTEM_PROMPT, buildUserPrompt } from "./prompts";
 
-// Use /v1/responses endpoint for server-side tool execution (x_search, web_search)
-const GROK_API_URL = "https://api.x.ai/v1/responses";
+// Use standard OpenAI-compatible chat completions endpoint
+const GROK_API_URL = "https://api.x.ai/v1/chat/completions";
 const GROK_MODEL = "grok-4-1-fast-reasoning";
-const API_TIMEOUT = 120000; // 120 seconds for agentic calls
+const API_TIMEOUT = 120000; // 120 seconds
 
 export class GrokAPIError extends Error {
   constructor(
@@ -32,20 +32,18 @@ export async function analyzeXHandle(
 
   const userPrompt = buildUserPrompt(handle, analysisType, competitorHandle);
 
-  // Using /v1/responses endpoint with server-side tools for real-time X search
+  // Using standard chat completions endpoint (OpenAI-compatible)
+  // Note: No real-time X search - uses Grok's trained knowledge + reasoning
+  // For real-time X data, need to use xAI Python SDK with x_search() tool
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const requestBody: any = {
     model: GROK_MODEL,
-    input: [
+    messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: userPrompt },
     ],
-    tools: [
-      { type: "x_search" },
-      { type: "web_search" },
-    ],
-    tool_choice: "auto",
     stream: false,
+    max_tokens: 4096,
   };
 
   const controller = new AbortController();
@@ -92,21 +90,8 @@ export async function analyzeXHandle(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data: any = await response.json();
 
-    // Handle different response formats (/v1/responses vs /v1/chat/completions)
-    let content: string | null = null;
-
-    // Try /v1/responses format first (output field)
-    if (data.output) {
-      content = data.output;
-    }
-    // Try /v1/chat/completions format (choices array)
-    else if (data.choices && data.choices.length > 0) {
-      content = data.choices[0].message?.content;
-    }
-    // Try direct content field
-    else if (data.content) {
-      content = data.content;
-    }
+    // Parse standard OpenAI chat completions response format
+    const content = data.choices?.[0]?.message?.content ?? "";
 
     if (!content) {
       const debugInfo = JSON.stringify(data).slice(0, 800);
