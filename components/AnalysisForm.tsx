@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnalysisType, ANALYSIS_TYPE_LABELS } from "@/lib/types";
 import { analyzeHandle } from "@/app/actions/analyze";
+import ProBanner from "./ProBanner";
 
 export default function AnalysisForm() {
   const router = useRouter();
@@ -13,10 +14,12 @@ export default function AnalysisForm() {
     useState<AnalysisType>("full-growth-audit");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rateLimited, setRateLimited] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setRateLimited(false);
     setIsLoading(true);
 
     const formData = new FormData();
@@ -44,6 +47,9 @@ export default function AnalysisForm() {
         router.push(`/report/${result.handle}`);
       } else {
         setError(result.error || "Failed to analyze handle");
+        if (result.rateLimited) {
+          setRateLimited(true);
+        }
         setIsLoading(false);
       }
     } catch (err) {
@@ -160,6 +166,13 @@ export default function AnalysisForm() {
               d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <p className="text-red-400 text-sm">{error}</p>
+        </div>
+      )}
+
+      {/* Rate Limit - Show Pro Banner */}
+      {rateLimited && (
+        <div className="animate-fade-in">
+          <ProBanner />
         </div>
       )}
 

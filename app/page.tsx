@@ -1,5 +1,6 @@
 import AnalysisForm from "@/components/AnalysisForm";
 import RecentReports from "@/components/RecentReports";
+import ProBanner from "@/components/ProBanner";
 
 export default function Home() {
   return (
@@ -56,7 +57,7 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-2">
               <CheckCircleIcon />
-              <span>Free to use</span>
+              <span>5 free reports/day</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircleIcon />
@@ -82,6 +83,11 @@ export default function Home() {
 
         {/* Recent Reports */}
         <RecentReports />
+
+        {/* Pro Banner with Waitlist */}
+        <div className="mt-16 w-full animate-fade-in stagger-3">
+          <ProBanner />
+        </div>
       </div>
     </div>
   );
