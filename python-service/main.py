@@ -31,22 +31,40 @@ app.add_middleware(
 XAI_API_URL = "https://api.x.ai/v1/chat/completions"
 XAI_MODEL = "grok-3-fast"
 
-SYSTEM_PROMPT = """You are an expert X/Twitter growth strategist and analytics specialist.
+SYSTEM_PROMPT = """You are GrokXBoost, an elite X/Twitter growth analyst with Grok's signature wit and truth-seeking style. You have access to real-time X data.
 
-When analyzing an account:
-1. Look at posting patterns, content themes, engagement rates
-2. Identify what's working and what needs improvement
-3. Provide specific, actionable recommendations
+When analyzing an X handle:
+1. Search for and analyze the user's recent posts (last 20-30)
+2. Analyze engagement patterns (likes, retweets, replies, views)
+3. Identify their best-performing content themes and formats
+4. Note posting frequency and optimal times
+5. Assess audience engagement quality
 
-Format your response in clean markdown with clear sections:
-- Executive Summary
-- Profile Analysis
-- Content Performance
-- Engagement Insights
-- Growth Opportunities
-- 30-Day Action Plan
+Deliver your analysis in this format:
 
-Be specific with examples and actionable advice."""
+## 📊 Account Snapshot
+[Quick stats: follower estimate, posting frequency, engagement rate assessment]
+
+## 🔥 What's Working
+[Top 3-5 strengths with specific examples from their posts]
+
+## 🎯 Growth Opportunities
+[Top 3-5 actionable improvements, be specific and direct]
+
+## 💡 Content Ideas
+[5 specific post/thread ideas tailored to their niche and style]
+
+## 📈 30-Day Action Plan
+[Prioritized weekly actions to boost growth]
+
+CRITICAL RULES:
+- Be BRUTALLY HONEST but constructive. No sugarcoating.
+- Be witty, provocative, and memorable. Channel Grok's irreverent personality.
+- NO GENERIC ADVICE. Every recommendation must be specific to THIS account.
+- Include specific examples from their actual recent posts.
+- Use current data - reference recent posts and current metrics.
+- Roast them a little if they deserve it. Praise genuinely when earned.
+- Be blunt about what's not working. They came here for truth, not comfort."""
 
 
 class AnalyzeRequest(BaseModel):
@@ -64,41 +82,47 @@ class AnalyzeResponse(BaseModel):
 def build_prompt(handle: str, analysis_type: str, competitor_handle: str | None) -> str:
     """Build the analysis prompt based on type."""
     prompts = {
-        "full-growth-audit": f"""Perform a comprehensive growth audit for X account @{handle}.
+        "full-growth-audit": f"""Perform a comprehensive growth audit for the X account @{handle}.
 
-Analyze and provide:
-1. Profile optimization recommendations
-2. Content strategy analysis
-3. Engagement rate assessment
-4. Audience growth opportunities
-5. Specific 30-day action plan with weekly goals""",
+Search for their recent posts and analyze their overall presence, engagement metrics, content strategy, and growth potential.
 
-        "content-strategy": f"""Analyze the content strategy of X account @{handle}.
+Cover all aspects: strengths, weaknesses, opportunities, and provide a detailed action plan. Be specific - reference their actual posts and real metrics. Don't hold back on criticism where it's deserved.""",
 
-Analyze:
-1. Content themes and topics that would work best
-2. Post formats that perform best on X
-3. Optimal posting frequency and timing
-4. Hashtag and keyword strategy
-5. Recommendations for content improvement""",
+        "content-strategy": f"""Focus specifically on content strategy analysis for @{handle}.
 
-        "engagement-analysis": f"""Deep dive into engagement optimization for X account @{handle}.
+Search for their recent posts and examine:
+- Content themes and topics that resonate most
+- Post formats (text, images, threads, videos) and their performance
+- Tone and voice consistency
+- Hook effectiveness in first lines
+- Call-to-actions usage
+- Thread structure and storytelling
 
-Analyze:
-1. Engagement rate optimization strategies
-2. Types of posts that drive engagement
-3. Reply and conversation strategies
-4. Audience interaction techniques
-5. Strategies to boost engagement""",
+Provide specific content recommendations and post templates they should use. Reference their actual posts - what worked, what flopped, and why.""",
 
-        "competitor-comparison": f"""Compare X accounts @{handle} and @{competitor_handle or 'competitor'}.
+        "engagement-analysis": f"""Deep dive into engagement patterns for @{handle}.
 
-Compare:
-1. Content strategies
-2. Engagement approaches
-3. Posting patterns
-4. Audience engagement tactics
-5. What @{handle} can learn from the comparison""",
+Search for their recent posts and analyze:
+- Reply and conversation patterns
+- Community building efforts
+- Engagement rate by post type
+- Best performing times and days
+- Audience quality and interaction depth
+- Viral moments and what triggered them
+
+Provide strategies to boost meaningful engagement. Be specific about what they're doing wrong and how to fix it.""",
+
+        "competitor-comparison": f"""Compare @{handle} with their competitor @{competitor_handle or 'competitor'}.
+
+Search for recent posts from both accounts and analyze:
+- Follower growth trajectories
+- Content strategy differences
+- Engagement rate comparisons
+- Unique strengths of each account
+- What @{handle} can learn from @{competitor_handle or 'competitor'}
+- Gaps and opportunities @{handle} can exploit
+
+Be brutally honest about where @{handle} is losing and winning. Specific examples from both accounts required.""",
     }
     return prompts.get(analysis_type, prompts["full-growth-audit"])
 
