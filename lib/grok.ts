@@ -6,8 +6,9 @@ const GROK_API_URL = "https://api.x.ai/v1/chat/completions";
 const GROK_MODEL = "grok-3-fast";
 const API_TIMEOUT = 120000; // 120 seconds
 
-// Enable real-time X search (set to false to use static knowledge only)
-const USE_REALTIME_SEARCH = process.env.USE_REALTIME_SEARCH !== "false";
+// Note: Real-time X search requires xAI Python SDK with server-side tool execution
+// Current implementation uses Grok's trained knowledge (sufficient for launch)
+// Phase 2: Add Python proxy service for real-time x_search when needed
 
 export class GrokAPIError extends Error {
   constructor(
@@ -35,8 +36,7 @@ export async function analyzeXHandle(
 
   const userPrompt = buildUserPrompt(handle, analysisType, competitorHandle);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const requestBody: any = {
+  const requestBody = {
     model: GROK_MODEL,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
@@ -45,30 +45,6 @@ export async function analyzeXHandle(
     stream: false,
     max_tokens: 4096,
   };
-
-  // Enable real-time X search if configured
-  if (USE_REALTIME_SEARCH) {
-    requestBody.tools = [
-      {
-        type: "function",
-        function: {
-          name: "x_search",
-          description: "Search X/Twitter for real-time posts, profiles, engagement data, and trends. Use this to get current information about any X account or topic.",
-          parameters: {
-            type: "object",
-            properties: {
-              query: {
-                type: "string",
-                description: "The search query - can be a username (from:username), hashtag, or keywords",
-              },
-            },
-            required: ["query"],
-          },
-        },
-      },
-    ];
-    requestBody.tool_choice = "auto";
-  }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
@@ -99,7 +75,6 @@ export async function analyzeXHandle(
       } else if (response.status >= 500) {
         errorMessage += "Grok API is temporarily unavailable. Please try again.";
       } else {
-        // Show actual error for debugging
         try {
           const parsed = JSON.parse(errorText);
           errorMessage += parsed.error?.message || errorText.slice(0, 200);
@@ -114,7 +89,6 @@ export async function analyzeXHandle(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data: any = await response.json();
 
-    // Parse standard OpenAI chat completions response format
     const content = data.choices?.[0]?.message?.content ?? "";
 
     if (!content) {
@@ -150,18 +124,15 @@ export function validateHandle(handle: string): {
   cleanHandle: string;
   error?: string;
 } {
-  // Remove @ if present
   let cleanHandle = handle.trim();
   if (cleanHandle.startsWith("@")) {
     cleanHandle = cleanHandle.slice(1);
   }
 
-  // Check if empty
   if (!cleanHandle) {
     return { valid: false, cleanHandle: "", error: "Please enter an X handle" };
   }
 
-  // Check length (X handles are 1-15 characters)
   if (cleanHandle.length > 15) {
     return {
       valid: false,
@@ -170,7 +141,6 @@ export function validateHandle(handle: string): {
     };
   }
 
-  // Check format (alphanumeric and underscores only)
   const handleRegex = /^[a-zA-Z0-9_]+$/;
   if (!handleRegex.test(cleanHandle)) {
     return {
