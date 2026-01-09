@@ -1,8 +1,24 @@
 "use server";
 
+import { headers } from "next/headers";
 import { analyzeXHandle, validateHandle, GrokAPIError } from "@/lib/grok";
 import { AnalysisResult, AnalysisType } from "@/lib/types";
-import { storeReport, getReport, isKVConfigured } from "@/lib/kv";
+import { storeReport, getReport, isKVConfigured, trackRecentReport } from "@/lib/kv";
+import { checkUsage, incrementUsage, DAILY_LIMIT } from "@/lib/usage";
+
+// Get client IP from headers
+async function getClientIP(): Promise<string> {
+  const headersList = await headers();
+  const forwardedFor = headersList.get("x-forwarded-for");
+  if (forwardedFor) {
+    return forwardedFor.split(",")[0].trim();
+  }
+  const realIp = headersList.get("x-real-ip");
+  if (realIp) {
+    return realIp;
+  }
+  return "unknown";
+}
 
 export async function analyzeHandle(
   formData: FormData
@@ -46,6 +62,21 @@ export async function analyzeHandle(
     cleanCompetitorHandle = competitorValidation.cleanHandle;
   }
 
+  // Check rate limit
+  const clientIP = await getClientIP();
+  const usage = await checkUsage(clientIP);
+
+  if (!usage.allowed) {
+    return {
+      success: false,
+      error: `You've reached your free daily limit (${DAILY_LIMIT} reports). Upgrade to Pro for unlimited analyses!`,
+      handle: validation.cleanHandle,
+      analysisType,
+      rateLimited: true,
+      remaining: 0,
+    };
+  }
+
   try {
     const report = await analyzeXHandle(
       validation.cleanHandle,
@@ -53,14 +84,24 @@ export async function analyzeHandle(
       cleanCompetitorHandle
     );
 
+    // Increment usage count
+    await incrementUsage(clientIP);
+
     // Store report in KV for persistence (fire and forget, don't block on errors)
     if (isKVConfigured()) {
-      storeReport(
-        validation.cleanHandle,
-        report,
-        analysisType,
-        cleanCompetitorHandle
-      ).catch((err) => {
+      Promise.all([
+        storeReport(
+          validation.cleanHandle,
+          report,
+          analysisType,
+          cleanCompetitorHandle
+        ),
+        trackRecentReport(
+          validation.cleanHandle,
+          analysisType,
+          cleanCompetitorHandle
+        ),
+      ]).catch((err) => {
         console.error("Failed to store report in KV:", err);
       });
     }
@@ -70,6 +111,7 @@ export async function analyzeHandle(
       report,
       handle: validation.cleanHandle,
       analysisType,
+      remaining: usage.remaining - 1,
     };
   } catch (error) {
     if (error instanceof GrokAPIError) {
