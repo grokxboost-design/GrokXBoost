@@ -40,6 +40,14 @@ export async function analyzeXHandle(
     tools: [
       {
         type: "live_search",
+        search_parameters: {
+          mode: "auto",
+          return_citations: true,
+          sources: [
+            { type: "x" },
+            { type: "web" },
+          ],
+        },
       },
     ],
   };
