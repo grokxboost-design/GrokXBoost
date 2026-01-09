@@ -2,6 +2,7 @@
 
 import { analyzeXHandle, validateHandle, GrokAPIError } from "@/lib/grok";
 import { AnalysisResult, AnalysisType } from "@/lib/types";
+import { storeReport, getReport, isKVConfigured } from "@/lib/kv";
 
 export async function analyzeHandle(
   formData: FormData
@@ -52,6 +53,18 @@ export async function analyzeHandle(
       cleanCompetitorHandle
     );
 
+    // Store report in KV for persistence (fire and forget, don't block on errors)
+    if (isKVConfigured()) {
+      storeReport(
+        validation.cleanHandle,
+        report,
+        analysisType,
+        cleanCompetitorHandle
+      ).catch((err) => {
+        console.error("Failed to store report in KV:", err);
+      });
+    }
+
     return {
       success: true,
       report,
@@ -80,4 +93,53 @@ export async function analyzeHandle(
       analysisType,
     };
   }
+}
+
+// Fetch a cached report from KV
+export async function fetchCachedReport(
+  handle: string,
+  analysisType?: AnalysisType,
+  competitorHandle?: string
+): Promise<{
+  found: boolean;
+  report?: string;
+  analysisType?: AnalysisType;
+  competitorHandle?: string;
+  createdAt?: string;
+}> {
+  if (!isKVConfigured()) {
+    return { found: false };
+  }
+
+  const cleanHandle = handle.toLowerCase().replace(/^@/, "");
+
+  // If no analysis type specified, get the latest report for this handle
+  if (!analysisType) {
+    const { getLatestReport } = await import("@/lib/kv");
+    const stored = await getLatestReport(cleanHandle);
+    if (stored) {
+      return {
+        found: true,
+        report: stored.report,
+        analysisType: stored.analysisType,
+        competitorHandle: stored.competitorHandle,
+        createdAt: stored.createdAt,
+      };
+    }
+    return { found: false };
+  }
+
+  // Get specific report
+  const stored = await getReport(cleanHandle, analysisType, competitorHandle);
+  if (stored) {
+    return {
+      found: true,
+      report: stored.report,
+      analysisType: stored.analysisType,
+      competitorHandle: stored.competitorHandle,
+      createdAt: stored.createdAt,
+    };
+  }
+
+  return { found: false };
 }

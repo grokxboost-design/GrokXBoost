@@ -10,6 +10,7 @@ interface ReportDisplayProps {
   report: string;
   analysisType: AnalysisType;
   competitorHandle?: string;
+  createdAt?: string;
 }
 
 export default function ReportDisplay({
@@ -17,13 +18,16 @@ export default function ReportDisplay({
   report,
   analysisType,
   competitorHandle,
+  createdAt,
 }: ReportDisplayProps) {
   const [shareUrl, setShareUrl] = useState("");
   const [copied, setCopied] = useState(false);
-  const [generatedAt] = useState(new Date());
+  const [linkCopied, setLinkCopied] = useState(false);
+  const generatedAt = createdAt ? new Date(createdAt) : new Date();
 
   useEffect(() => {
-    setShareUrl(window.location.origin);
+    // Use the full current URL for sharing
+    setShareUrl(window.location.href);
   }, []);
 
   const handleCopyReport = async () => {
@@ -33,6 +37,16 @@ export default function ReportDisplay({
       setTimeout(() => setCopied(false), 2500);
     } catch (err) {
       console.error("Failed to copy:", err);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2500);
+    } catch (err) {
+      console.error("Failed to copy link:", err);
     }
   };
 
@@ -77,6 +91,22 @@ export default function ReportDisplay({
 
           {/* Quick Actions */}
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleCopyLink}
+              className={`copy-button ${linkCopied ? "copy-button-success" : ""}`}
+            >
+              {linkCopied ? (
+                <>
+                  <CheckIcon />
+                  <span>Link Copied!</span>
+                </>
+              ) : (
+                <>
+                  <LinkIcon />
+                  <span>Copy Link</span>
+                </>
+              )}
+            </button>
             <button
               onClick={handleCopyReport}
               className={`copy-button ${copied ? "copy-button-success" : ""}`}
@@ -203,6 +233,15 @@ function CheckIcon() {
   return (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+    </svg>
+  );
+}
+
+function LinkIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
     </svg>
   );
 }
