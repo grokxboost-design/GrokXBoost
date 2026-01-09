@@ -33,17 +33,23 @@ export async function analyzeXHandle(
   const userPrompt = buildUserPrompt(handle, analysisType, competitorHandle);
 
   // Using /v1/responses endpoint with simplified tools for server-side execution
+  // Note: /v1/responses uses "input" instead of "messages"
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const requestBody: any = {
     model: GROK_MODEL,
-    messages: [
+    input: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: userPrompt },
     ],
     tools: [
-      { type: "x_search" },
+      { type: "x_user_search" },
+      { type: "x_keyword_search" },
+      { type: "x_semantic_search" },
+      { type: "x_thread_fetch" },
       { type: "web_search" },
     ],
+    tool_choice: "auto",
+    stream: false,
   };
 
   const controller = new AbortController();
