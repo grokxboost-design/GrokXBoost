@@ -274,9 +274,8 @@ async function analyzeWithDirectAPI(
 
 Use specific examples from the fetched posts and be brutally honest, witty, and direct.`
             }
-          ],
-          tools: [],
-          tool_choice: "none"
+          ]
+          // NO tools or tool_choice - causes 400 error
         };
 
         const synthesisResponse = await fetch(GROK_API_URL, {

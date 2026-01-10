@@ -266,7 +266,7 @@ async def analyze(request: AnalyzeRequest):
 
                 # If completed but no text, try synthesis with previous_response_id
                 if data.get("status") == "completed":
-                    # Synthesis body with tools: [] required when tool_choice is set
+                    # Synthesis body - no tools or tool_choice (let model respond naturally)
                     synthesis_body = {
                         "model": XAI_MODEL,
                         "previous_response_id": current_response_id,
@@ -281,9 +281,7 @@ async def analyze(request: AnalyzeRequest):
                                 "## 📈 30-Day Action Plan\n\n"
                                 "Be brutally honest, witty, and direct."
                             }
-                        ],
-                        "tools": [],  # Required when tool_choice is set
-                        "tool_choice": "none"
+                        ]
                     }
 
                     # Debug: log synthesis request
