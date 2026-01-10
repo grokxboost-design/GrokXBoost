@@ -25,42 +25,26 @@ export interface GrokMessage {
   content: string;
 }
 
-export interface GrokFunctionTool {
-  type: "function";
-  function: {
-    name: string;
-    parameters: {
-      type: string;
-      properties: Record<string, unknown>;
-    };
-  };
+// Agent tools for /v1/responses endpoint
+export interface GrokAgentTool {
+  type: "x_search" | "web_search";
 }
-
-export type GrokTool = GrokFunctionTool;
 
 export interface GrokAPIRequest {
   model: string;
-  messages: GrokMessage[];
-  tools: GrokTool[];
+  input: GrokMessage[];
+  tools: GrokAgentTool[];
+  tool_choice: "auto" | "required" | "none";
 }
 
 export interface GrokAPIResponse {
   id: string;
-  object: string;
-  created: number;
+  output_text: string;
   model: string;
-  choices: {
-    index: number;
-    message: {
-      role: string;
-      content: string;
-    };
-    finish_reason: string;
-  }[];
+  stop_reason: string;
   usage: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
+    input_tokens: number;
+    output_tokens: number;
   };
 }
 

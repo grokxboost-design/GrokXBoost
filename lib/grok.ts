@@ -1,9 +1,9 @@
 import { AnalysisType } from "./types";
 import { SYSTEM_PROMPT, buildUserPrompt } from "./prompts";
 
-// Direct xAI API (fallback when Python service not available)
-const GROK_API_URL = "https://api.x.ai/v1/chat/completions";
-const GROK_MODEL = "grok-3-fast";
+// xAI API using modern /v1/responses endpoint with agent tools
+const GROK_API_URL = "https://api.x.ai/v1/responses";
+const GROK_MODEL = "grok-4-1-fast-reasoning";
 const API_TIMEOUT = 120000; // 120 seconds
 
 // Real-time Python service URL (set in Vercel env vars after deploying to Render)
@@ -122,12 +122,15 @@ async function analyzeWithDirectAPI(
 
   const requestBody = {
     model: GROK_MODEL,
-    messages: [
+    input: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: userPrompt },
     ],
-    stream: false,
-    max_tokens: 4096,
+    tools: [
+      { type: "x_search" },
+      { type: "web_search" }
+    ],
+    tool_choice: "auto",
   };
 
   const controller = new AbortController();
@@ -173,7 +176,8 @@ async function analyzeWithDirectAPI(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data: any = await response.json();
 
-    const content = data.choices?.[0]?.message?.content ?? "";
+    // /v1/responses format: output_text contains the final response
+    const content = data.output_text ?? "";
 
     if (!content) {
       const debugInfo = JSON.stringify(data).slice(0, 800);
