@@ -103,7 +103,7 @@ async function analyzeWithRealtimeService(
 }
 
 /**
- * Direct xAI API analysis (no real-time search)
+ * Direct xAI API analysis with agent loop for real-time search
  */
 async function analyzeWithDirectAPI(
   handle: string,
@@ -120,110 +120,152 @@ async function analyzeWithDirectAPI(
 
   const userPrompt = buildUserPrompt(handle, analysisType, competitorHandle);
 
-  const requestBody = {
-    model: GROK_MODEL,
-    input: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: userPrompt },
-    ],
-    tools: [
-      { type: "x_search" },
-      { type: "web_search" }
-    ],
-    tool_choice: "auto",
-  };
+  let currentResponseId: string | null = null;
+  let finalContent = "";
+  let attempts = 0;
+  const maxAttempts = 10;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+  while (attempts < maxAttempts) {
+    attempts++;
 
-  try {
-    const response = await fetch(GROK_API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-      signal: controller.signal,
-    });
+    const requestBody: Record<string, unknown> = {
+      model: GROK_MODEL,
+      input: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
+      ],
+      tools: [
+        { type: "x_search" },
+        { type: "web_search" },
+      ],
+      tool_choice: "auto",
+    };
 
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage = `API Error (${response.status}): `;
-
-      if (response.status === 401) {
-        errorMessage += "Invalid API key. Please check your XAI_API_KEY.";
-      } else if (response.status === 429) {
-        errorMessage += "Rate limit exceeded. Please wait a moment and try again.";
-      } else if (response.status === 404) {
-        errorMessage += "Model or endpoint not found.";
-      } else if (response.status >= 500) {
-        errorMessage += "Grok API is temporarily unavailable. Please try again.";
-      } else {
-        try {
-          const parsed = JSON.parse(errorText);
-          errorMessage += parsed.error?.message || errorText.slice(0, 200);
-        } catch {
-          errorMessage += errorText.slice(0, 200);
-        }
-      }
-
-      throw new GrokAPIError(errorMessage, response.status, errorText);
+    // Continue from previous response if in a loop
+    if (currentResponseId) {
+      requestBody.previous_response_id = currentResponseId;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any = await response.json();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
-    // /v1/responses format: try multiple possible response structures
-    let content = data.output_text ?? "";
+    try {
+      const response = await fetch(GROK_API_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      });
 
-    // Fallback: check nested output array structure
-    if (!content && Array.isArray(data.output)) {
-      for (const item of data.output) {
-        if (item.type === "message" && item.role === "assistant") {
-          if (Array.isArray(item.content)) {
-            for (const block of item.content) {
-              if (block.type === "text") {
-                content = block.text ?? "";
-                break;
-              }
-            }
-          } else if (typeof item.content === "string") {
-            content = item.content;
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `API Error (${response.status}): `;
+
+        if (response.status === 401) {
+          errorMessage += "Invalid API key. Please check your XAI_API_KEY.";
+        } else if (response.status === 429) {
+          errorMessage += "Rate limit exceeded. Please wait a moment and try again.";
+        } else if (response.status === 404) {
+          errorMessage += "Model or endpoint not found.";
+        } else if (response.status >= 500) {
+          errorMessage += "Grok API is temporarily unavailable. Please try again.";
+        } else {
+          try {
+            const parsed = JSON.parse(errorText);
+            errorMessage += parsed.error?.message || errorText.slice(0, 200);
+          } catch {
+            errorMessage += errorText.slice(0, 200);
           }
         }
-        if (content) break;
+
+        throw new GrokAPIError(errorMessage, response.status, errorText);
       }
-    }
 
-    if (!content) {
-      const debugInfo = JSON.stringify(data).slice(0, 800);
-      throw new GrokAPIError(
-        `No content in response. Full response: ${debugInfo}`
-      );
-    }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data: any = await response.json();
 
-    return content;
-  } catch (error) {
-    clearTimeout(timeoutId);
+      // Update response ID for next iteration
+      currentResponseId = data.id;
 
-    if (error instanceof GrokAPIError) {
-      throw error;
-    }
-
-    if (error instanceof Error) {
-      if (error.name === "AbortError") {
-        throw new GrokAPIError(
-          "Analysis timed out. The request took too long to complete. Please try again."
-        );
+      // Check for final text output in the output array
+      if (Array.isArray(data.output)) {
+        for (const item of data.output) {
+          if (item.type === "text" && item.text) {
+            finalContent = item.text;
+            break;
+          }
+          // Also check message format
+          if (item.type === "message" && item.role === "assistant") {
+            if (Array.isArray(item.content)) {
+              for (const block of item.content) {
+                if (block.type === "text" && block.text) {
+                  finalContent = block.text;
+                  break;
+                }
+              }
+            } else if (typeof item.content === "string") {
+              finalContent = item.content;
+            }
+          }
+          if (finalContent) break;
+        }
       }
-      throw new GrokAPIError(`Network error: ${error.message}`);
-    }
 
-    throw new GrokAPIError("An unexpected error occurred during analysis");
+      // Check output_text as fallback
+      if (!finalContent && data.output_text) {
+        finalContent = data.output_text;
+      }
+
+      // Check text field as fallback
+      if (!finalContent && data.text) {
+        finalContent = data.text;
+      }
+
+      // If we have content, we're done
+      if (finalContent) {
+        break;
+      }
+
+      // If status is completed but no content, break to avoid infinite loop
+      if (data.status === "completed") {
+        break;
+      }
+
+      // Small delay before next iteration to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+    } catch (error) {
+      clearTimeout(timeoutId);
+
+      if (error instanceof GrokAPIError) {
+        throw error;
+      }
+
+      if (error instanceof Error) {
+        if (error.name === "AbortError") {
+          throw new GrokAPIError(
+            "Analysis timed out. The request took too long to complete. Please try again."
+          );
+        }
+        throw new GrokAPIError(`Network error: ${error.message}`);
+      }
+
+      throw new GrokAPIError("An unexpected error occurred during analysis");
+    }
   }
+
+  if (!finalContent) {
+    throw new GrokAPIError(
+      `Agent did not produce final output after ${maxAttempts} attempts. Please try again.`
+    );
+  }
+
+  return finalContent;
 }
 
 export function validateHandle(handle: string): {
