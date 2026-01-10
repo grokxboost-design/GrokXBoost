@@ -266,16 +266,23 @@ async def analyze(request: AnalyzeRequest):
 
                 # If completed but no text, try synthesis with previous_response_id
                 if data.get("status") == "completed":
-                    # Minimal synthesis body - just append user message
+                    # Synthesis body with tools: [] required when tool_choice is set
                     synthesis_body = {
                         "model": XAI_MODEL,
                         "previous_response_id": current_response_id,
                         "input": [
                             {
                                 "role": "user",
-                                "content": "Now synthesize the full X/Twitter growth analysis using all fetched data. Structure it exactly as: Account Snapshot, What's Working, Growth Opportunities, Content Ideas, 30-Day Action Plan. Be specific with recent posts."
+                                "content": "You have completed all tool calls and fetched the necessary real-time data. Do NOT call any more tools. Now immediately provide the complete X/Twitter growth analysis in this exact structured format, using specific examples from the fetched posts:\n\n"
+                                "## 📊 Account Snapshot\n\n"
+                                "## 🔥 What's Working\n\n"
+                                "## 🎯 Growth Opportunities\n\n"
+                                "## 💡 Content Ideas\n\n"
+                                "## 📈 30-Day Action Plan\n\n"
+                                "Be brutally honest, witty, and direct."
                             }
                         ],
+                        "tools": [],  # Required when tool_choice is set
                         "tool_choice": "none"
                     }
 
