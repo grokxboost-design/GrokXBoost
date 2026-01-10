@@ -178,8 +178,26 @@ async def analyze(request: AnalyzeRequest):
             )
 
         data = response.json()
-        # /v1/responses format: output_text contains the final response
+
+        # /v1/responses format: try multiple possible response structures
         content = data.get("output_text", "")
+
+        # Fallback: check nested output array structure
+        if not content and "output" in data:
+            output = data["output"]
+            if isinstance(output, list):
+                for item in output:
+                    if item.get("type") == "message" and item.get("role") == "assistant":
+                        item_content = item.get("content", [])
+                        if isinstance(item_content, list):
+                            for block in item_content:
+                                if block.get("type") == "text":
+                                    content = block.get("text", "")
+                                    break
+                        elif isinstance(item_content, str):
+                            content = item_content
+                    if content:
+                        break
 
         if not content:
             return AnalyzeResponse(
