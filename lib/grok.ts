@@ -176,8 +176,27 @@ async function analyzeWithDirectAPI(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data: any = await response.json();
 
-    // /v1/responses format: output_text contains the final response
-    const content = data.output_text ?? "";
+    // /v1/responses format: try multiple possible response structures
+    let content = data.output_text ?? "";
+
+    // Fallback: check nested output array structure
+    if (!content && Array.isArray(data.output)) {
+      for (const item of data.output) {
+        if (item.type === "message" && item.role === "assistant") {
+          if (Array.isArray(item.content)) {
+            for (const block of item.content) {
+              if (block.type === "text") {
+                content = block.text ?? "";
+                break;
+              }
+            }
+          } else if (typeof item.content === "string") {
+            content = item.content;
+          }
+        }
+        if (content) break;
+      }
+    }
 
     if (!content) {
       const debugInfo = JSON.stringify(data).slice(0, 800);
