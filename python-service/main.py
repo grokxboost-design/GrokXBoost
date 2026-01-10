@@ -133,11 +133,44 @@ async def health():
     return {"status": "ok", "service": "grokxboost-analysis"}
 
 
+def extract_text_content(data: dict) -> str:
+    """Extract text content from xAI response, checking multiple formats."""
+    content = ""
+
+    # Check output_text first
+    if data.get("output_text"):
+        return data["output_text"]
+
+    # Check text field
+    if data.get("text"):
+        return data["text"]
+
+    # Check output array for text items
+    if "output" in data and isinstance(data["output"], list):
+        for item in data["output"]:
+            # Direct text type
+            if item.get("type") == "text" and item.get("text"):
+                return item["text"]
+            # Message format
+            if item.get("type") == "message" and item.get("role") == "assistant":
+                item_content = item.get("content", [])
+                if isinstance(item_content, list):
+                    for block in item_content:
+                        if block.get("type") == "text" and block.get("text"):
+                            return block["text"]
+                elif isinstance(item_content, str):
+                    return item_content
+
+    return content
+
+
 @app.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(request: AnalyzeRequest):
     """
-    Analyze an X account using xAI Grok API.
+    Analyze an X account using xAI Grok API with agent loop.
     """
+    import asyncio
+
     api_key = os.getenv("XAI_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="XAI_API_KEY not configured")
@@ -149,14 +182,13 @@ async def analyze(request: AnalyzeRequest):
             request.competitor_handle
         )
 
+        current_response_id = None
+        final_content = ""
+        max_attempts = 10
+
         async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(
-                XAI_API_URL,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
+            for attempt in range(max_attempts):
+                request_body = {
                     "model": XAI_MODEL,
                     "input": [
                         {"role": "system", "content": SYSTEM_PROMPT},
@@ -167,48 +199,54 @@ async def analyze(request: AnalyzeRequest):
                         {"type": "web_search"}
                     ],
                     "tool_choice": "auto"
-                },
-            )
+                }
 
-        if response.status_code != 200:
-            error_detail = response.text[:500] if response.text else "No details"
+                # Continue from previous response if in a loop
+                if current_response_id:
+                    request_body["previous_response_id"] = current_response_id
+
+                response = await client.post(
+                    XAI_API_URL,
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json=request_body,
+                )
+
+                if response.status_code != 200:
+                    error_detail = response.text[:500] if response.text else "No details"
+                    return AnalyzeResponse(
+                        success=False,
+                        error=f"API error ({response.status_code}): {error_detail}"
+                    )
+
+                data = response.json()
+
+                # Update response ID for next iteration
+                current_response_id = data.get("id")
+
+                # Try to extract text content
+                final_content = extract_text_content(data)
+
+                # If we have content, we're done
+                if final_content:
+                    break
+
+                # If status is completed but no content, break
+                if data.get("status") == "completed":
+                    break
+
+                # Small delay before next iteration
+                await asyncio.sleep(0.5)
+
+        if not final_content:
             return AnalyzeResponse(
                 success=False,
-                error=f"API error ({response.status_code}): {error_detail}"
+                error=f"Agent did not produce final output after {max_attempts} attempts."
             )
 
-        data = response.json()
-
-        # /v1/responses format: try multiple possible response structures
-        content = data.get("output_text", "")
-
-        # Fallback: check nested output array structure
-        if not content and "output" in data:
-            output = data["output"]
-            if isinstance(output, list):
-                for item in output:
-                    if item.get("type") == "message" and item.get("role") == "assistant":
-                        item_content = item.get("content", [])
-                        if isinstance(item_content, list):
-                            for block in item_content:
-                                if block.get("type") == "text":
-                                    content = block.get("text", "")
-                                    break
-                        elif isinstance(item_content, str):
-                            content = item_content
-                    if content:
-                        break
-
-        if not content:
-            # Include response structure for debugging
-            debug_keys = list(data.keys()) if isinstance(data, dict) else str(type(data))
-            debug_sample = str(data)[:500]
-            return AnalyzeResponse(
-                success=False,
-                error=f"No analysis generated. Response keys: {debug_keys}. Sample: {debug_sample}"
-            )
-
-        return AnalyzeResponse(success=True, content=content)
+        return AnalyzeResponse(success=True, content=final_content)
 
     except httpx.TimeoutException:
         return AnalyzeResponse(
