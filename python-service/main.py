@@ -134,29 +134,30 @@ async def health():
 
 
 def extract_text_content(data: dict) -> str:
-    """Robustly extract plain text from xAI agent response, handling all known formats."""
+    """Ultra-robust extraction with debug logging for empty cases."""
     content_parts = []
 
     # Helper to safely get string value
     def safe_string(val) -> str:
         if isinstance(val, str):
-            return val
+            return val.strip()
         return ""
 
-    # Direct fields
-    if data.get("output_text"):
-        text = safe_string(data["output_text"])
-        if text:
-            content_parts.append(text)
+    # Known direct fields (check multiple possible locations)
+    for field in ["output_text", "text", "response", "message", "content"]:
+        if data.get(field):
+            text = safe_string(data[field])
+            if text:
+                content_parts.append(text)
 
-    if data.get("text"):
-        text = safe_string(data["text"])
-        if text:
-            content_parts.append(text)
-
-    # Nested output array
+    # Deep dive into output array (most common)
     if "output" in data and isinstance(data["output"], list):
         for item in data["output"]:
+            # Handle string items directly
+            if isinstance(item, str):
+                content_parts.append(safe_string(item))
+                continue
+
             # Direct text item
             if item.get("type") == "text":
                 text = safe_string(item.get("text", ""))
@@ -173,10 +174,16 @@ def extract_text_content(data: dict) -> str:
                             if text:
                                 content_parts.append(text)
                 elif isinstance(item_content, str):
-                    content_parts.append(item_content)
+                    content_parts.append(safe_string(item_content))
 
-    # Join all parts (in case of multiple text blocks)
-    return "\n\n".join(filter(None, content_parts))
+    final = "\n\n".join(filter(None, content_parts))
+
+    # Debug log if empty (helps diagnose issues)
+    if not final:
+        print("DEBUG: No text extracted. Raw keys:", list(data.keys()))
+        print("DEBUG: Output sample:", str(data.get("output", data))[:1000])
+
+    return final
 
 
 @app.post("/analyze", response_model=AnalyzeResponse)
@@ -199,16 +206,13 @@ async def analyze(request: AnalyzeRequest):
 
         current_response_id = None
         final_content = ""
-        max_attempts = 10
+        max_attempts = 15
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             for attempt in range(max_attempts):
+                # Build request body - only include input on first request
                 request_body = {
                     "model": XAI_MODEL,
-                    "input": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": prompt},
-                    ],
                     "tools": [
                         {"type": "x_search"},
                         {"type": "web_search"}
@@ -216,9 +220,15 @@ async def analyze(request: AnalyzeRequest):
                     "tool_choice": "auto"
                 }
 
-                # Continue from previous response if in a loop
+                # First request: include input messages
+                # Subsequent requests: only include previous_response_id
                 if current_response_id:
                     request_body["previous_response_id"] = current_response_id
+                else:
+                    request_body["input"] = [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": prompt},
+                    ]
 
                 response = await client.post(
                     XAI_API_URL,

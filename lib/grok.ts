@@ -123,17 +123,14 @@ async function analyzeWithDirectAPI(
   let currentResponseId: string | null = null;
   let finalContent = "";
   let attempts = 0;
-  const maxAttempts = 10;
+  const maxAttempts = 15;
 
   while (attempts < maxAttempts) {
     attempts++;
 
+    // Build request body - only include input on first request
     const requestBody: Record<string, unknown> = {
       model: GROK_MODEL,
-      input: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userPrompt },
-      ],
       tools: [
         { type: "x_search" },
         { type: "web_search" },
@@ -141,9 +138,15 @@ async function analyzeWithDirectAPI(
       tool_choice: "auto",
     };
 
-    // Continue from previous response if in a loop
+    // First request: include input messages
+    // Subsequent requests: only include previous_response_id
     if (currentResponseId) {
       requestBody.previous_response_id = currentResponseId;
+    } else {
+      requestBody.input = [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
+      ];
     }
 
     const controller = new AbortController();
@@ -194,40 +197,54 @@ async function analyzeWithDirectAPI(
 
       // Helper to safely get string value
       const safeString = (val: unknown): string =>
-        typeof val === "string" ? val : "";
+        typeof val === "string" ? val.trim() : "";
 
-      // Check for final text output in the output array
+      const contentParts: string[] = [];
+
+      // Check known direct fields
+      for (const field of ["output_text", "text", "response", "message", "content"]) {
+        if (data[field]) {
+          const text = safeString(data[field]);
+          if (text) contentParts.push(text);
+        }
+      }
+
+      // Deep dive into output array
       if (Array.isArray(data.output)) {
         for (const item of data.output) {
-          if (item.type === "text" && typeof item.text === "string") {
-            finalContent = item.text;
-            break;
+          // Handle string items directly
+          if (typeof item === "string") {
+            contentParts.push(item.trim());
+            continue;
           }
-          // Also check message format
+
+          // Direct text item
+          if (item.type === "text" && typeof item.text === "string") {
+            contentParts.push(item.text.trim());
+          }
+
+          // Message format (assistant role)
           if (item.type === "message" && item.role === "assistant") {
             if (Array.isArray(item.content)) {
               for (const block of item.content) {
                 if (block.type === "text" && typeof block.text === "string") {
-                  finalContent = block.text;
-                  break;
+                  contentParts.push(block.text.trim());
                 }
               }
             } else if (typeof item.content === "string") {
-              finalContent = item.content;
+              contentParts.push(item.content.trim());
             }
           }
-          if (finalContent) break;
         }
       }
 
-      // Check output_text as fallback (ensure it's a string)
-      if (!finalContent && data.output_text) {
-        finalContent = safeString(data.output_text);
-      }
+      // Join all parts
+      finalContent = contentParts.filter(Boolean).join("\n\n");
 
-      // Check text field as fallback (ensure it's a string)
-      if (!finalContent && data.text) {
-        finalContent = safeString(data.text);
+      // Debug log if empty
+      if (!finalContent) {
+        console.log("DEBUG: No text extracted. Raw keys:", Object.keys(data));
+        console.log("DEBUG: Output sample:", JSON.stringify(data.output || data).slice(0, 1000));
       }
 
       // If we have content, we're done
