@@ -128,12 +128,9 @@ async function analyzeWithDirectAPI(
   while (attempts < maxAttempts) {
     attempts++;
 
+    // Build request body - only include input on first request
     const requestBody: Record<string, unknown> = {
       model: GROK_MODEL,
-      input: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userPrompt },
-      ],
       tools: [
         { type: "x_search" },
         { type: "web_search" },
@@ -141,9 +138,15 @@ async function analyzeWithDirectAPI(
       tool_choice: "auto",
     };
 
-    // Continue from previous response if in a loop
+    // First request: include input messages
+    // Subsequent requests: only include previous_response_id
     if (currentResponseId) {
       requestBody.previous_response_id = currentResponseId;
+    } else {
+      requestBody.input = [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
+      ];
     }
 
     const controller = new AbortController();

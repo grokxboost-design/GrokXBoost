@@ -203,12 +203,9 @@ async def analyze(request: AnalyzeRequest):
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             for attempt in range(max_attempts):
+                # Build request body - only include input on first request
                 request_body = {
                     "model": XAI_MODEL,
-                    "input": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": prompt},
-                    ],
                     "tools": [
                         {"type": "x_search"},
                         {"type": "web_search"}
@@ -216,9 +213,15 @@ async def analyze(request: AnalyzeRequest):
                     "tool_choice": "auto"
                 }
 
-                # Continue from previous response if in a loop
+                # First request: include input messages
+                # Subsequent requests: only include previous_response_id
                 if current_response_id:
                     request_body["previous_response_id"] = current_response_id
+                else:
+                    request_body["input"] = [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": prompt},
+                    ]
 
                 response = await client.post(
                     XAI_API_URL,
