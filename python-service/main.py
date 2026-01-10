@@ -28,7 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-XAI_API_URL = "https://api.x.ai/v1/chat/completions"
+XAI_API_URL = "https://api.x.ai/v1/responses"
 XAI_MODEL = "grok-3-fast"
 
 SYSTEM_PROMPT = """You are GrokXBoost, an elite X/Twitter growth analyst with Grok's signature wit and truth-seeking style. You have access to real-time X data.
@@ -158,18 +158,15 @@ async def analyze(request: AnalyzeRequest):
                 },
                 json={
                     "model": XAI_MODEL,
-                    "messages": [
+                    "input": [
                         {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user", "content": prompt},
                     ],
-                    "max_tokens": 4096,
-                    "search_parameters": {
-                        "mode": "auto",
-                        "sources": [
-                            {"type": "x_posts"},
-                            {"type": "web"}
-                        ]
-                    }
+                    "tools": [
+                        {"type": "x_search"},
+                        {"type": "web_search"}
+                    ],
+                    "tool_choice": "auto"
                 },
             )
 
@@ -181,7 +178,8 @@ async def analyze(request: AnalyzeRequest):
             )
 
         data = response.json()
-        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        # /v1/responses format: output_text contains the final response
+        content = data.get("output_text", "")
 
         if not content:
             return AnalyzeResponse(
