@@ -266,25 +266,23 @@ async def analyze(request: AnalyzeRequest):
 
                 # If completed but no text, try synthesis with previous_response_id
                 if data.get("status") == "completed":
-                    # Append synthesis prompt to existing conversation (preserve tool results)
+                    # Minimal synthesis body - just append user message
                     synthesis_body = {
                         "model": XAI_MODEL,
                         "previous_response_id": current_response_id,
                         "input": [
                             {
                                 "role": "user",
-                                "content": "You have now fetched all necessary data from the tools. Do NOT call any more tools. Immediately provide the complete X/Twitter growth analysis in this exact structured format:\n\n"
-                                "## 📊 Account Snapshot\n\n"
-                                "## 🔥 What's Working\n\n"
-                                "## 🎯 Growth Opportunities\n\n"
-                                "## 💡 Content Ideas\n\n"
-                                "## 📈 30-Day Action Plan\n\n"
-                                "Use specific examples from the fetched posts and be brutally honest, witty, and direct."
+                                "content": "Now synthesize the full X/Twitter growth analysis using all fetched data. Structure it exactly as: Account Snapshot, What's Working, Growth Opportunities, Content Ideas, 30-Day Action Plan. Be specific with recent posts."
                             }
                         ],
-                        "tools": [],
                         "tool_choice": "none"
                     }
+
+                    # Debug: log synthesis request
+                    import json
+                    print("SYNTHESIS REQUEST BODY:", json.dumps(synthesis_body, indent=2))
+                    print("PREVIOUS_RESPONSE_ID:", current_response_id)
 
                     synth_response = await client.post(
                         XAI_API_URL,
@@ -295,18 +293,25 @@ async def analyze(request: AnalyzeRequest):
                         json=synthesis_body,
                     )
 
-                    if synth_response.status_code == 200:
-                        synth_data = synth_response.json()
-                        final_content = extract_text_content(synth_data)
-                        if final_content.strip():
-                            return AnalyzeResponse(success=True, content=final_content)
-                        # Debug: log raw synthesis response
-                        import json
-                        print("SYNTHESIS RAW:", json.dumps(synth_data, indent=2)[:2000])
+                    if synth_response.status_code != 200:
+                        error_text = synth_response.text
+                        print("SYNTHESIS ERROR RESPONSE:", error_text[:1000])
+                        return AnalyzeResponse(
+                            success=False,
+                            error=f"Synthesis failed ({synth_response.status_code}): {error_text[:300]}"
+                        )
+
+                    synth_data = synth_response.json()
+                    final_content = extract_text_content(synth_data)
+                    if final_content.strip():
+                        return AnalyzeResponse(success=True, content=final_content)
+
+                    # Debug: log raw synthesis response
+                    print("SYNTHESIS RAW:", json.dumps(synth_data, indent=2)[:2000])
 
                     return AnalyzeResponse(
                         success=False,
-                        error=f"Synthesis failed (status={synth_response.status_code}). Please try again."
+                        error="Synthesis returned no text. Please try again."
                     )
 
                 await asyncio.sleep(0.5)
