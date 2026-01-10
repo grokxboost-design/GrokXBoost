@@ -252,8 +252,52 @@ async function analyzeWithDirectAPI(
         break;
       }
 
-      // If status is completed but no content, break to avoid infinite loop
-      if (data.status === "completed") {
+      // If tools completed but no text, force a final synthesis
+      if (data.status === "completed" || attempts >= 3) {
+        const synthesisBody = {
+          model: GROK_MODEL,
+          input: [
+            { role: "user", content: "Using all the tool results and data fetched, provide the complete X/Twitter growth analysis now in the structured format: Account Snapshot, What's Working, Growth Opportunities, Content Ideas, 30-Day Action Plan. Be specific with examples from the actual posts." }
+          ],
+          previous_response_id: currentResponseId,
+          tools: [],
+          tool_choice: "none"
+        };
+
+        const synthesisResponse = await fetch(GROK_API_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(synthesisBody),
+        });
+
+        if (synthesisResponse.ok) {
+          const synthesisData: any = await synthesisResponse.json();
+
+          // Extract from synthesis response
+          const synthParts: string[] = [];
+          for (const field of ["output_text", "text", "response", "message", "content"]) {
+            if (synthesisData[field] && typeof synthesisData[field] === "string") {
+              synthParts.push(synthesisData[field].trim());
+            }
+          }
+          if (Array.isArray(synthesisData.output)) {
+            for (const item of synthesisData.output) {
+              if (item.type === "text" && typeof item.text === "string") {
+                synthParts.push(item.text.trim());
+              }
+            }
+          }
+          finalContent = synthParts.filter(Boolean).join("\n\n");
+
+          if (finalContent) {
+            break;
+          }
+        }
+
+        // If still no content, break to avoid infinite loop
         break;
       }
 

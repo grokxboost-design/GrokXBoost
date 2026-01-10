@@ -279,16 +279,42 @@ async def analyze(request: AnalyzeRequest):
                 if final_content.strip():
                     break
 
-                # If status is completed but no content, return with debug info
-                if data.get("status") == "completed":
+                # If tools completed but no text, force a final synthesis
+                if data.get("status") == "completed" or attempt >= 2:
+                    # Add a final prompt to force text output
+                    synthesis_body = {
+                        "model": XAI_MODEL,
+                        "input": [
+                            {"role": "user", "content": "Using all the tool results and data fetched, provide the complete X/Twitter growth analysis now in the structured format: Account Snapshot, What's Working, Growth Opportunities, Content Ideas, 30-Day Action Plan. Be specific with examples from the actual posts."}
+                        ],
+                        "previous_response_id": current_response_id,
+                        "tools": [],
+                        "tool_choice": "none"
+                    }
+
+                    synthesis_response = await client.post(
+                        XAI_API_URL,
+                        headers={
+                            "Authorization": f"Bearer {api_key}",
+                            "Content-Type": "application/json",
+                        },
+                        json=synthesis_body,
+                    )
+
+                    if synthesis_response.status_code == 200:
+                        synthesis_data = synthesis_response.json()
+                        final_content = extract_text_content(synthesis_data)
+                        if final_content.strip():
+                            break
+
+                    # If still no content after synthesis, return error with debug
                     if not final_content.strip():
                         import json
                         debug_info = json.dumps(data, default=str)[:800]
                         return AnalyzeResponse(
                             success=False,
-                            error=f"Agent completed but returned no text. Response: {debug_info}"
+                            error=f"No text after synthesis. Response: {debug_info}"
                         )
-                    break
 
                 # Small delay before next iteration
                 await asyncio.sleep(0.5)
