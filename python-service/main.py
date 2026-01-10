@@ -200,9 +200,12 @@ async def analyze(request: AnalyzeRequest):
                         break
 
         if not content:
+            # Include response structure for debugging
+            debug_keys = list(data.keys()) if isinstance(data, dict) else str(type(data))
+            debug_sample = str(data)[:500]
             return AnalyzeResponse(
                 success=False,
-                error="No analysis generated. Please try again."
+                error=f"No analysis generated. Response keys: {debug_keys}. Sample: {debug_sample}"
             )
 
         return AnalyzeResponse(success=True, content=content)
