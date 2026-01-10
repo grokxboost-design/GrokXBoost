@@ -2,13 +2,17 @@
 GrokXBoost Real-Time Analysis Service
 
 Uses the official xAI SDK for reliable real-time X/Twitter data analysis.
-The SDK handles the full agent loop internally and returns final text.
+The SDK handles the full agent loop internally and ensures tool results
+are properly incorporated into the final synthesis.
 """
 
 import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+from xai_sdk import Client
+from xai_sdk.tools import x_search, web_search, x_user_search, x_keyword_search, x_thread_fetch
 
 app = FastAPI(title="GrokXBoost Analysis Service")
 
@@ -129,129 +133,67 @@ async def health():
     return {"status": "ok", "service": "grokxboost-analysis"}
 
 
+# Initialize xAI client at module level
+xai_client = None
+
+def get_xai_client():
+    """Get or create the xAI client."""
+    global xai_client
+    if xai_client is None:
+        api_key = os.getenv("XAI_API_KEY")
+        if not api_key:
+            raise HTTPException(status_code=500, detail="XAI_API_KEY not configured")
+        xai_client = Client(api_key=api_key)
+    return xai_client
+
+
 @app.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(request: AnalyzeRequest):
     """
     Analyze an X account using xAI SDK with real-time tools.
+    The SDK handles the full agent loop and ensures tool results
+    are properly incorporated into the final synthesis.
     """
-    api_key = os.getenv("XAI_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="XAI_API_KEY not configured")
-
-    prompt = build_prompt(
-        request.handle,
-        request.analysis_type,
-        request.competitor_handle
-    )
-
-    # Try SDK first, fall back to httpx
     try:
-        from xai_sdk import Client
-        from xai_sdk.tools import x_search, web_search
+        client = get_xai_client()
 
-        client = Client(api_key=api_key)
-
-        # Create chat with tools
-        chat = client.chat.create(
-            model=XAI_MODEL,
-            tools=[x_search(), web_search()],
+        prompt = build_prompt(
+            request.handle,
+            request.analysis_type,
+            request.competitor_handle
         )
 
-        # Add messages using SDK's expected format
-        chat.add_system_message(SYSTEM_PROMPT)
-        chat.add_user_message(prompt)
+        # Create chat with all real-time X tools
+        chat = client.chat.create(
+            model=XAI_MODEL,
+            tools=[
+                x_search(),
+                web_search(),
+                x_user_search(),
+                x_keyword_search(),
+                x_thread_fetch(),
+            ],
+        )
 
-        # SDK handles the full agent loop and returns final text
+        # Add messages using SDK's append method
+        chat.append({"role": "system", "content": SYSTEM_PROMPT})
+        chat.append({"role": "user", "content": prompt})
+
+        # SDK handles the full agent loop internally and returns final text
+        # with tool results properly incorporated
         response = chat.sample()
 
         if response.content:
             return AnalyzeResponse(success=True, content=response.content)
         else:
-            return AnalyzeResponse(success=False, error="SDK returned no content")
-
-    except ImportError:
-        print("xai-sdk not available, using httpx fallback")
-        return await analyze_with_httpx(request, api_key, prompt)
-    except AttributeError as e:
-        # SDK API might be different, try alternative methods
-        print(f"SDK method error: {e}, trying alternative")
-        return await analyze_with_sdk_alt(request, api_key, prompt)
-    except Exception as e:
-        print(f"SDK error: {e}, using httpx fallback")
-        return await analyze_with_httpx(request, api_key, prompt)
-
-
-async def analyze_with_sdk_alt(request: AnalyzeRequest, api_key: str, prompt: str) -> AnalyzeResponse:
-    """Try alternative SDK methods."""
-    try:
-        from xai_sdk import Client
-
-        client = Client(api_key=api_key)
-
-        # Try different SDK interface patterns
-        response = client.chat.completions.create(
-            model=XAI_MODEL,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt}
-            ],
-            tools=[
-                {"type": "x_search"},
-                {"type": "web_search"}
-            ],
-            tool_choice="auto"
-        )
-
-        content = response.choices[0].message.content if response.choices else None
-        if content:
-            return AnalyzeResponse(success=True, content=content)
-        else:
-            return await analyze_with_httpx(request, api_key, prompt)
-
-    except Exception as e:
-        print(f"SDK alt error: {e}")
-        return await analyze_with_httpx(request, api_key, prompt)
-
-
-async def analyze_with_httpx(request: AnalyzeRequest, api_key: str, prompt: str) -> AnalyzeResponse:
-    """Fallback to httpx without real-time tools."""
-    import httpx
-
-    try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            # Simple request without tools - just use model's knowledge
-            response = await client.post(
-                "https://api.x.ai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": XAI_MODEL,
-                    "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "max_tokens": 4096
-                },
-            )
-
-        if response.status_code != 200:
             return AnalyzeResponse(
                 success=False,
-                error=f"API error ({response.status_code}): {response.text[:300]}"
+                error="Analysis completed but no content returned. Please try again."
             )
 
-        data = response.json()
-        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-
-        if content:
-            return AnalyzeResponse(success=True, content=content)
-        else:
-            return AnalyzeResponse(success=False, error="No content in response")
-
     except Exception as e:
-        return AnalyzeResponse(success=False, error=f"Request failed: {str(e)}")
+        print(f"Analysis error: {e}")
+        return AnalyzeResponse(success=False, error=f"Analysis failed: {str(e)}")
 
 
 if __name__ == "__main__":
