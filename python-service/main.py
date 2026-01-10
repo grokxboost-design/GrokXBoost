@@ -1,18 +1,17 @@
 """
 GrokXBoost Real-Time Analysis Service
 
-Uses the official xAI SDK for reliable real-time X/Twitter data analysis.
-The SDK handles the full agent loop internally and ensures tool results
-are properly incorporated into the final synthesis.
+Uses direct httpx calls to xAI's /v1/responses endpoint with robust
+response parsing that handles all edge cases in the agent loop.
 """
 
 import os
+import asyncio
+import json
+import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
-from xai_sdk import Client
-from xai_sdk.tools import x_search, web_search
 
 app = FastAPI(title="GrokXBoost Analysis Service")
 
@@ -29,7 +28,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-XAI_MODEL = "grok-4-1-fast-reasoning"
+XAI_MODEL = "grok-3"
+XAI_API_URL = "https://api.x.ai/v1/responses"
 
 SYSTEM_PROMPT = """You are GrokXBoost, an elite X/Twitter growth analyst with Grok's signature wit and truth-seeking style. You have access to real-time X data.
 
@@ -127,67 +127,179 @@ Be brutally honest about where @{handle} is losing and winning. Specific example
     return prompts.get(analysis_type, prompts["full-growth-audit"])
 
 
+def extract_text_content(data: dict) -> str:
+    """
+    Robustly extract text content from xAI response.
+    Handles all response formats and gracefully skips unknown types.
+    """
+    content_parts = []
+
+    def safe_string(val) -> str:
+        if isinstance(val, str):
+            return val.strip()
+        return ""
+
+    # Direct text fields
+    for field in ["output_text", "text"]:
+        if data.get(field):
+            content_parts.append(safe_string(data[field]))
+
+    # Output array - ONLY process known safe types
+    if "output" in data and isinstance(data["output"], list):
+        for item in data["output"]:
+            if not isinstance(item, dict):
+                # Fallback: if item is pure string (rare but possible)
+                if isinstance(item, str):
+                    content_parts.append(safe_string(item))
+                continue
+
+            item_type = item.get("type")
+
+            # Explicitly skip all tool-related types
+            if item_type in ["custom_tool_call", "tool_call", "function_call", "tool", "x_search_call", "web_search_call"]:
+                continue
+
+            # Known good: text block
+            if item_type == "text":
+                text = safe_string(item.get("text", ""))
+                if text:
+                    content_parts.append(text)
+
+            # Known good: assistant message
+            if item_type == "message" and item.get("role") == "assistant":
+                content = item.get("content", [])
+                if isinstance(content, list):
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "text":
+                            text = safe_string(block.get("text", ""))
+                            if text:
+                                content_parts.append(text)
+                elif isinstance(content, str):
+                    content_parts.append(safe_string(content))
+
+    return "\n\n".join([p for p in content_parts if p])
+
+
 @app.get("/health")
 async def health():
     """Health check endpoint."""
     return {"status": "ok", "service": "grokxboost-analysis"}
 
 
-# Initialize xAI client at module level
-xai_client = None
-
-def get_xai_client():
-    """Get or create the xAI client."""
-    global xai_client
-    if xai_client is None:
-        api_key = os.getenv("XAI_API_KEY")
-        if not api_key:
-            raise HTTPException(status_code=500, detail="XAI_API_KEY not configured")
-        xai_client = Client(api_key=api_key)
-    return xai_client
-
-
 @app.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(request: AnalyzeRequest):
     """
-    Analyze an X account using xAI SDK with real-time tools.
-    The SDK handles the full agent loop and ensures tool results
-    are properly incorporated into the final synthesis.
+    Analyze an X account using xAI's /v1/responses endpoint.
+    Implements robust agent loop with proper response parsing.
     """
+    api_key = os.getenv("XAI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="XAI_API_KEY not configured")
+
+    prompt = build_prompt(
+        request.handle,
+        request.analysis_type,
+        request.competitor_handle
+    )
+
+    # Initial request with tools
+    payload = {
+        "model": XAI_MODEL,
+        "instructions": SYSTEM_PROMPT,
+        "input": prompt,
+        "tools": [
+            {"type": "x_search"},
+            {"type": "web_search"}
+        ]
+    }
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+
+    max_iterations = 20
+    previous_response_id = None
+    tool_types = {"custom_tool_call", "tool_call", "function_call", "tool", "x_search_call", "web_search_call"}
+
     try:
-        client = get_xai_client()
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            for iteration in range(max_iterations):
+                print(f"[Iteration {iteration + 1}] Calling xAI API...")
 
-        prompt = build_prompt(
-            request.handle,
-            request.analysis_type,
-            request.competitor_handle
-        )
+                # For continuation, use previous_response_id
+                if previous_response_id:
+                    payload = {
+                        "model": XAI_MODEL,
+                        "previous_response_id": previous_response_id
+                    }
 
-        # Create chat with real-time tools
-        # x_search() handles user profiles, keyword searches, threads, etc. internally
-        chat = client.chat.create(
-            model=XAI_MODEL,
-            tools=[x_search(), web_search()],
-        )
+                response = await client.post(XAI_API_URL, headers=headers, json=payload)
 
-        # Add messages using SDK's append method
-        chat.append({"role": "system", "content": SYSTEM_PROMPT})
-        chat.append({"role": "user", "content": prompt})
+                if response.status_code != 200:
+                    error_text = response.text
+                    print(f"[Error] API returned {response.status_code}: {error_text}")
+                    return AnalyzeResponse(
+                        success=False,
+                        error=f"API error ({response.status_code}): {error_text[:200]}"
+                    )
 
-        # SDK handles the full agent loop internally and returns final text
-        # with tool results properly incorporated
-        response = chat.sample()
+                data = response.json()
+                previous_response_id = data.get("id")
 
-        if response.content:
-            return AnalyzeResponse(success=True, content=response.content)
-        else:
+                # Debug: log response structure
+                print(f"[Iteration {iteration + 1}] Status: {data.get('status')}, Output items: {len(data.get('output', []))}")
+
+                # Try to extract text content
+                final_content = extract_text_content(data)
+                if final_content.strip():
+                    print(f"[Success] Extracted {len(final_content)} chars of content")
+                    return AnalyzeResponse(success=True, content=final_content)
+
+                # Check if response contains ONLY tool calls (intermediate state)
+                output_items = data.get("output", [])
+                if output_items and all(
+                    isinstance(item, dict) and item.get("type") in tool_types
+                    for item in output_items
+                ):
+                    print(f"[Iteration {iteration + 1}] Tool-only response, continuing...")
+                    await asyncio.sleep(0.5)
+                    continue
+
+                # Check status for completion
+                status = data.get("status")
+                if status == "completed":
+                    # Completed but no text - try synthesis prompt
+                    print("[Warning] Completed but no text content, requesting synthesis...")
+                    payload = {
+                        "model": XAI_MODEL,
+                        "previous_response_id": previous_response_id,
+                        "input": "Based on all the data you gathered, provide your complete analysis now."
+                    }
+                    continue
+
+                if status == "failed":
+                    error_msg = data.get("error", {}).get("message", "Unknown error")
+                    return AnalyzeResponse(success=False, error=f"Analysis failed: {error_msg}")
+
+                if status in ["in_progress", "queued"]:
+                    print(f"[Iteration {iteration + 1}] Status: {status}, waiting...")
+                    await asyncio.sleep(1.0)
+                    continue
+
+                # Unknown status or empty output - continue loop
+                await asyncio.sleep(0.5)
+
+            # Max iterations reached
             return AnalyzeResponse(
                 success=False,
-                error="Analysis completed but no content returned. Please try again."
+                error="Analysis timed out after maximum iterations. Please try again."
             )
 
+    except httpx.TimeoutException:
+        return AnalyzeResponse(success=False, error="Request timed out. Please try again.")
     except Exception as e:
-        print(f"Analysis error: {e}")
+        print(f"[Error] Unexpected exception: {e}")
         return AnalyzeResponse(success=False, error=f"Analysis failed: {str(e)}")
 
 
