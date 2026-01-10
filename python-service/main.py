@@ -29,7 +29,7 @@ app.add_middleware(
 )
 
 XAI_API_URL = "https://api.x.ai/v1/responses"
-XAI_MODEL = "grok-3-fast"
+XAI_MODEL = "grok-4-1-fast-reasoning"
 
 SYSTEM_PROMPT = """You are GrokXBoost, an elite X/Twitter growth analyst with Grok's signature wit and truth-seeking style. You have access to real-time X data.
 
