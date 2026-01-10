@@ -144,11 +144,20 @@ def extract_text_content(data: dict) -> str:
         return ""
 
     # Known direct fields (check multiple possible locations)
-    for field in ["output_text", "text", "response", "message", "content"]:
+    for field in ["output_text", "text", "response", "message", "content", "reasoning", "result", "answer"]:
         if data.get(field):
             text = safe_string(data[field])
             if text:
                 content_parts.append(text)
+
+    # Check reasoning object (might have content inside)
+    if "reasoning" in data and isinstance(data["reasoning"], dict):
+        reasoning = data["reasoning"]
+        for rfield in ["content", "text", "summary"]:
+            if reasoning.get(rfield):
+                text = safe_string(reasoning[rfield])
+                if text:
+                    content_parts.append(text)
 
     # Deep dive into output array (most common)
     if "output" in data and isinstance(data["output"], list):
@@ -158,18 +167,29 @@ def extract_text_content(data: dict) -> str:
                 content_parts.append(safe_string(item))
                 continue
 
+            if not isinstance(item, dict):
+                continue
+
             # Direct text item
             if item.get("type") == "text":
                 text = safe_string(item.get("text", ""))
                 if text:
                     content_parts.append(text)
 
+            # Reasoning type
+            if item.get("type") == "reasoning":
+                for rfield in ["content", "text", "summary"]:
+                    if item.get(rfield):
+                        text = safe_string(item[rfield])
+                        if text:
+                            content_parts.append(text)
+
             # Message format (assistant role)
             if item.get("type") == "message" and item.get("role") == "assistant":
                 item_content = item.get("content", [])
                 if isinstance(item_content, list):
                     for block in item_content:
-                        if block.get("type") == "text":
+                        if isinstance(block, dict) and block.get("type") == "text":
                             text = safe_string(block.get("text", ""))
                             if text:
                                 content_parts.append(text)
@@ -180,8 +200,9 @@ def extract_text_content(data: dict) -> str:
 
     # Debug log if empty (helps diagnose issues)
     if not final:
+        import json
         print("DEBUG: No text extracted. Raw keys:", list(data.keys()))
-        print("DEBUG: Output sample:", str(data.get("output", data))[:1000])
+        print("DEBUG: Full response:", json.dumps(data, default=str)[:2000])
 
     return final
 
@@ -258,12 +279,14 @@ async def analyze(request: AnalyzeRequest):
                 if final_content.strip():
                     break
 
-                # If status is completed but no content, break
+                # If status is completed but no content, return with debug info
                 if data.get("status") == "completed":
                     if not final_content.strip():
+                        import json
+                        debug_info = json.dumps(data, default=str)[:800]
                         return AnalyzeResponse(
                             success=False,
-                            error="Agent completed but returned no text content."
+                            error=f"Agent completed but returned no text. Response: {debug_info}"
                         )
                     break
 
