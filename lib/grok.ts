@@ -3,7 +3,7 @@ import { SYSTEM_PROMPT, buildUserPrompt } from "./prompts";
 
 // xAI API using modern /v1/responses endpoint with agent tools
 const GROK_API_URL = "https://api.x.ai/v1/responses";
-const GROK_MODEL = "grok-3-fast";
+const GROK_MODEL = "grok-4-1-fast-reasoning";
 const API_TIMEOUT = 120000; // 120 seconds
 
 // Real-time Python service URL (set in Vercel env vars after deploying to Render)
