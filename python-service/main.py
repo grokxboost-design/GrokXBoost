@@ -134,34 +134,49 @@ async def health():
 
 
 def extract_text_content(data: dict) -> str:
-    """Extract text content from xAI response, checking multiple formats."""
-    content = ""
+    """Robustly extract plain text from xAI agent response, handling all known formats."""
+    content_parts = []
 
-    # Check output_text first
+    # Helper to safely get string value
+    def safe_string(val) -> str:
+        if isinstance(val, str):
+            return val
+        return ""
+
+    # Direct fields
     if data.get("output_text"):
-        return data["output_text"]
+        text = safe_string(data["output_text"])
+        if text:
+            content_parts.append(text)
 
-    # Check text field
     if data.get("text"):
-        return data["text"]
+        text = safe_string(data["text"])
+        if text:
+            content_parts.append(text)
 
-    # Check output array for text items
+    # Nested output array
     if "output" in data and isinstance(data["output"], list):
         for item in data["output"]:
-            # Direct text type
-            if item.get("type") == "text" and item.get("text"):
-                return item["text"]
-            # Message format
+            # Direct text item
+            if item.get("type") == "text":
+                text = safe_string(item.get("text", ""))
+                if text:
+                    content_parts.append(text)
+
+            # Message format (assistant role)
             if item.get("type") == "message" and item.get("role") == "assistant":
                 item_content = item.get("content", [])
                 if isinstance(item_content, list):
                     for block in item_content:
-                        if block.get("type") == "text" and block.get("text"):
-                            return block["text"]
+                        if block.get("type") == "text":
+                            text = safe_string(block.get("text", ""))
+                            if text:
+                                content_parts.append(text)
                 elif isinstance(item_content, str):
-                    return item_content
+                    content_parts.append(item_content)
 
-    return content
+    # Join all parts (in case of multiple text blocks)
+    return "\n\n".join(filter(None, content_parts))
 
 
 @app.post("/analyze", response_model=AnalyzeResponse)
@@ -230,11 +245,16 @@ async def analyze(request: AnalyzeRequest):
                 final_content = extract_text_content(data)
 
                 # If we have content, we're done
-                if final_content:
+                if final_content.strip():
                     break
 
                 # If status is completed but no content, break
                 if data.get("status") == "completed":
+                    if not final_content.strip():
+                        return AnalyzeResponse(
+                            success=False,
+                            error="Agent completed but returned no text content."
+                        )
                     break
 
                 # Small delay before next iteration
