@@ -281,13 +281,34 @@ async def analyze(request: AnalyzeRequest):
 
                 # If tools completed but no text, force a final synthesis
                 if data.get("status") == "completed" or attempt >= 2:
-                    # Add a final prompt to force text output
+                    # Make a fresh request without tools to force text output
                     synthesis_body = {
                         "model": XAI_MODEL,
                         "input": [
-                            {"role": "user", "content": "Using all the tool results and data fetched, provide the complete X/Twitter growth analysis now in the structured format: Account Snapshot, What's Working, Growth Opportunities, Content Ideas, 30-Day Action Plan. Be specific with examples from the actual posts."}
+                            {"role": "system", "content": SYSTEM_PROMPT},
+                            {"role": "user", "content": f"""You have already searched for and analyzed the X/Twitter account @{request.handle}.
+
+Based on your knowledge and the data you have access to about this account, provide the complete growth analysis NOW.
+
+DO NOT call any tools. DO NOT search again. Just provide the analysis immediately in this exact format:
+
+## 📊 Account Snapshot
+[Quick stats and overview]
+
+## 🔥 What's Working
+[Top 3-5 strengths with specific examples]
+
+## 🎯 Growth Opportunities
+[Top 3-5 actionable improvements]
+
+## 💡 Content Ideas
+[5 specific post/thread ideas]
+
+## 📈 30-Day Action Plan
+[Prioritized weekly actions]
+
+Be specific, witty, and brutally honest. Reference actual content patterns you know about this account."""}
                         ],
-                        "previous_response_id": current_response_id,
                         "tools": [],
                         "tool_choice": "none"
                     }
@@ -310,7 +331,7 @@ async def analyze(request: AnalyzeRequest):
                     # If still no content after synthesis, return error with debug
                     if not final_content.strip():
                         import json
-                        debug_info = json.dumps(data, default=str)[:800]
+                        debug_info = json.dumps(synthesis_data if synthesis_response.status_code == 200 else data, default=str)[:800]
                         return AnalyzeResponse(
                             success=False,
                             error=f"No text after synthesis. Response: {debug_info}"

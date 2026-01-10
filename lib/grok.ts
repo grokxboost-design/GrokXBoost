@@ -257,9 +257,30 @@ async function analyzeWithDirectAPI(
         const synthesisBody = {
           model: GROK_MODEL,
           input: [
-            { role: "user", content: "Using all the tool results and data fetched, provide the complete X/Twitter growth analysis now in the structured format: Account Snapshot, What's Working, Growth Opportunities, Content Ideas, 30-Day Action Plan. Be specific with examples from the actual posts." }
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: `You have already searched for and analyzed the X/Twitter account @${handle}.
+
+Based on your knowledge and the data you have access to about this account, provide the complete growth analysis NOW.
+
+DO NOT call any tools. DO NOT search again. Just provide the analysis immediately in this exact format:
+
+## 📊 Account Snapshot
+[Quick stats and overview]
+
+## 🔥 What's Working
+[Top 3-5 strengths with specific examples]
+
+## 🎯 Growth Opportunities
+[Top 3-5 actionable improvements]
+
+## 💡 Content Ideas
+[5 specific post/thread ideas]
+
+## 📈 30-Day Action Plan
+[Prioritized weekly actions]
+
+Be specific, witty, and brutally honest. Reference actual content patterns you know about this account.` }
           ],
-          previous_response_id: currentResponseId,
           tools: [],
           tool_choice: "none"
         };
