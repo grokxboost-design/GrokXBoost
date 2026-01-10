@@ -192,10 +192,14 @@ async function analyzeWithDirectAPI(
       // Update response ID for next iteration
       currentResponseId = data.id;
 
+      // Helper to safely get string value
+      const safeString = (val: unknown): string =>
+        typeof val === "string" ? val : "";
+
       // Check for final text output in the output array
       if (Array.isArray(data.output)) {
         for (const item of data.output) {
-          if (item.type === "text" && item.text) {
+          if (item.type === "text" && typeof item.text === "string") {
             finalContent = item.text;
             break;
           }
@@ -203,7 +207,7 @@ async function analyzeWithDirectAPI(
           if (item.type === "message" && item.role === "assistant") {
             if (Array.isArray(item.content)) {
               for (const block of item.content) {
-                if (block.type === "text" && block.text) {
+                if (block.type === "text" && typeof block.text === "string") {
                   finalContent = block.text;
                   break;
                 }
@@ -216,14 +220,14 @@ async function analyzeWithDirectAPI(
         }
       }
 
-      // Check output_text as fallback
+      // Check output_text as fallback (ensure it's a string)
       if (!finalContent && data.output_text) {
-        finalContent = data.output_text;
+        finalContent = safeString(data.output_text);
       }
 
-      // Check text field as fallback
+      // Check text field as fallback (ensure it's a string)
       if (!finalContent && data.text) {
-        finalContent = data.text;
+        finalContent = safeString(data.text);
       }
 
       // If we have content, we're done
