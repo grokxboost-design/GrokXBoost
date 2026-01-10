@@ -252,34 +252,28 @@ async function analyzeWithDirectAPI(
         break;
       }
 
-      // If tools completed but no text, force a final synthesis
+      // If tools completed but no text, force a final synthesis with previous_response_id
       if (data.status === "completed" || attempts >= 3) {
         const synthesisBody = {
           model: GROK_MODEL,
+          previous_response_id: currentResponseId,
           input: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: `You have already searched for and analyzed the X/Twitter account @${handle}.
-
-Based on your knowledge and the data you have access to about this account, provide the complete growth analysis NOW.
-
-DO NOT call any tools. DO NOT search again. Just provide the analysis immediately in this exact format:
+            {
+              role: "user",
+              content: `You have now fetched all necessary data from the tools. Do NOT call any more tools. Immediately provide the complete X/Twitter growth analysis in this exact structured format:
 
 ## 📊 Account Snapshot
-[Quick stats and overview]
 
 ## 🔥 What's Working
-[Top 3-5 strengths with specific examples]
 
 ## 🎯 Growth Opportunities
-[Top 3-5 actionable improvements]
 
 ## 💡 Content Ideas
-[5 specific post/thread ideas]
 
 ## 📈 30-Day Action Plan
-[Prioritized weekly actions]
 
-Be specific, witty, and brutally honest. Reference actual content patterns you know about this account.` }
+Use specific examples from the fetched posts and be brutally honest, witty, and direct.`
+            }
           ],
           tools: [],
           tool_choice: "none"

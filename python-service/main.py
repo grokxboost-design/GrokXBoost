@@ -264,24 +264,23 @@ async def analyze(request: AnalyzeRequest):
                     await asyncio.sleep(0.5)
                     continue
 
-                # If completed but no text, try synthesis
+                # If completed but no text, try synthesis with previous_response_id
                 if data.get("status") == "completed":
-                    # Force a synthesis request without tools
+                    # Append synthesis prompt to existing conversation (preserve tool results)
                     synthesis_body = {
                         "model": XAI_MODEL,
+                        "previous_response_id": current_response_id,
                         "input": [
-                            {"role": "system", "content": SYSTEM_PROMPT},
-                            {"role": "user", "content": f"""Analyze the X/Twitter account @{request.handle}.
-
-Provide a complete growth analysis in this exact format:
-
-## 📊 Account Snapshot
-## 🔥 What's Working
-## 🎯 Growth Opportunities
-## 💡 Content Ideas
-## 📈 30-Day Action Plan
-
-Be specific, witty, and brutally honest."""}
+                            {
+                                "role": "user",
+                                "content": "You have now fetched all necessary data from the tools. Do NOT call any more tools. Immediately provide the complete X/Twitter growth analysis in this exact structured format:\n\n"
+                                "## 📊 Account Snapshot\n\n"
+                                "## 🔥 What's Working\n\n"
+                                "## 🎯 Growth Opportunities\n\n"
+                                "## 💡 Content Ideas\n\n"
+                                "## 📈 30-Day Action Plan\n\n"
+                                "Use specific examples from the fetched posts and be brutally honest, witty, and direct."
+                            }
                         ],
                         "tools": [],
                         "tool_choice": "none"
@@ -304,7 +303,7 @@ Be specific, witty, and brutally honest."""}
 
                     return AnalyzeResponse(
                         success=False,
-                        error="Agent completed but no text synthesized. Please try again."
+                        error="Synthesis failed - no text returned. Please try again."
                     )
 
                 await asyncio.sleep(0.5)
