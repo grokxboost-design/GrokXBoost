@@ -141,6 +141,7 @@ async def analyze(request: AnalyzeRequest):
 
     try:
         from xai_sdk import Client
+        from xai_sdk.tools import x_search, web_search
 
         client = Client(api_key=api_key)
 
@@ -150,12 +151,12 @@ async def analyze(request: AnalyzeRequest):
             request.competitor_handle
         )
 
-        # Create chat with real-time X search tools
+        # Create chat with real-time X search tools (use SDK tool functions)
         chat = client.chat.create(
             model=XAI_MODEL,
             tools=[
-                {"type": "x_search"},
-                {"type": "web_search"},
+                x_search(),
+                web_search(),
             ],
         )
 
@@ -174,7 +175,7 @@ async def analyze(request: AnalyzeRequest):
 
         return AnalyzeResponse(success=True, content=response.content)
 
-    except ImportError:
+    except ImportError as e:
         # Fallback to httpx if SDK not available
         return await analyze_with_httpx(request, api_key)
     except Exception as e:
