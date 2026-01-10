@@ -300,10 +300,13 @@ async def analyze(request: AnalyzeRequest):
                         final_content = extract_text_content(synth_data)
                         if final_content.strip():
                             return AnalyzeResponse(success=True, content=final_content)
+                        # Debug: log raw synthesis response
+                        import json
+                        print("SYNTHESIS RAW:", json.dumps(synth_data, indent=2)[:2000])
 
                     return AnalyzeResponse(
                         success=False,
-                        error="Synthesis failed - no text returned. Please try again."
+                        error=f"Synthesis failed (status={synth_response.status_code}). Please try again."
                     )
 
                 await asyncio.sleep(0.5)
