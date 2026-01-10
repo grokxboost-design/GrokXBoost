@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from xai_sdk import Client
-from xai_sdk.tools import x_search, web_search, x_user_search, x_keyword_search, x_thread_fetch
+from xai_sdk.tools import x_search, web_search
 
 app = FastAPI(title="GrokXBoost Analysis Service")
 
@@ -163,16 +163,11 @@ async def analyze(request: AnalyzeRequest):
             request.competitor_handle
         )
 
-        # Create chat with all real-time X tools
+        # Create chat with real-time tools
+        # x_search() handles user profiles, keyword searches, threads, etc. internally
         chat = client.chat.create(
             model=XAI_MODEL,
-            tools=[
-                x_search(),
-                web_search(),
-                x_user_search(),
-                x_keyword_search(),
-                x_thread_fetch(),
-            ],
+            tools=[x_search(), web_search()],
         )
 
         # Add messages using SDK's append method
