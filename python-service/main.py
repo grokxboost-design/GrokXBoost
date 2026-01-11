@@ -202,15 +202,18 @@ async def analyze(request: AnalyzeRequest):
         request.competitor_handle
     )
 
-    # Initial request with tools
+    # Initial request with tools - input must be array of message objects
     payload = {
         "model": XAI_MODEL,
-        "instructions": SYSTEM_PROMPT,
-        "input": prompt,
+        "input": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt}
+        ],
         "tools": [
             {"type": "x_search"},
             {"type": "web_search"}
-        ]
+        ],
+        "tool_choice": "auto"
     }
 
     headers = {
@@ -274,7 +277,11 @@ async def analyze(request: AnalyzeRequest):
                     payload = {
                         "model": XAI_MODEL,
                         "previous_response_id": previous_response_id,
-                        "input": "Based on all the data you gathered, provide your complete analysis now."
+                        "input": [
+                            {"role": "user", "content": "Based on all the data you gathered, provide your complete analysis now."}
+                        ],
+                        "tools": [],
+                        "tool_choice": "none"
                     }
                     continue
 
